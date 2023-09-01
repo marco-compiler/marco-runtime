@@ -1,197 +1,58 @@
-#include "marco/Modeling/Range.h"
+#include "marco/Runtime/Modeling/Range.h"
+#include <algorithm>
+#include <cassert>
 
-namespace marco::modeling
+namespace marco::runtime
 {
-  Range::Range(Range::data_type begin, Range::data_type end)
-      : begin_(begin), end_(end)
-  {
-    assert(begin < end && "Range is not well-formed");
-  }
-
-  bool Range::operator==(Range::data_type other) const
-  {
-    return getBegin() == other && getEnd() == other + 1;
-  }
-
-  bool Range::operator==(const Range& other) const
-  {
-    return getBegin() == other.getBegin() && getEnd() == other.getEnd();
-  }
-
-  bool Range::operator!=(Range::data_type other) const
-  {
-    return getBegin() != other && getEnd() != other + 1;
-  }
-
-  bool Range::operator!=(const Range& other) const
-  {
-    return getBegin() != other.getBegin() || getEnd() != other.getEnd();
-  }
-
   bool Range::operator<(const Range& other) const
   {
-    if (getBegin() == other.getBegin()) {
-      return getEnd() < other.getEnd();
+    if (begin == other.begin) {
+      return end < other.end;
     }
 
-    return getBegin() < other.getBegin();
+    return begin < other.begin;
   }
 
-  bool Range::operator>(const Range& other) const
-  {
-    if (getBegin() == other.getBegin()) {
-      return getEnd() > other.getEnd();
-    }
-
-    return getBegin() > other.getBegin();
-  }
-
-  Range::data_type Range::getBegin() const
-  {
-    return begin_;
-  }
-
-  Range::data_type Range::getEnd() const
-  {
-    return end_;
-  }
-
-  size_t Range::size() const
-  {
-    return getEnd() - getBegin();
-  }
-
-  bool Range::contains(Range::data_type value) const
-  {
-    return value >= getBegin() && value < getEnd();
-  }
-
-  bool Range::contains(const Range& other) const
-  {
-    return getBegin() <= other.getBegin() &&
-        getEnd() >= other.getEnd();
-  }
-
-  bool Range::overlaps(const Range& other) const
-  {
-    return (getBegin() <= other.getEnd() - 1) &&
-        (getEnd() - 1 >= other.getBegin());
-  }
-
-  Range Range::intersect(const Range& other) const
-  {
-    assert(overlaps(other));
-
-    if (contains(other)) {
-      return other;
-    }
-
-    if (other.contains(*this)) {
-      return *this;
-    }
-
-    if (getBegin() <= other.getBegin()) {
-      return Range(other.getBegin(), getEnd());
-    }
-
-    return Range(getBegin(), other.getEnd());
-  }
-
-  bool Range::canBeMerged(const Range& other) const
-  {
-    return getBegin() == other.getEnd() ||
-        getEnd() == other.getBegin() ||
-        overlaps(other);
-  }
-
-  Range Range::merge(const Range& other) const
-  {
-    assert(canBeMerged(other));
-
-    if (overlaps(other)) {
-      Point::data_type begin = std::min(getBegin(), other.getBegin());
-      Point::data_type end = std::max(getEnd(), other.getEnd());
-      return Range(begin, end);
-    }
-
-    if (getBegin() == other.getEnd()) {
-      return Range(other.getBegin(), getEnd());
-    }
-
-    return Range(getBegin(), other.getEnd());
-  }
-
-  std::vector<Range> Range::subtract(const Range& other) const
-  {
-    std::vector<Range> results;
-
-    if (!overlaps(other)) {
-      results.push_back(*this);
-    } else if (contains(other)) {
-      if (getBegin() != other.getBegin()) {
-        results.emplace_back(getBegin(), other.getBegin());
-      }
-
-      if (getEnd() != other.getEnd()) {
-        results.emplace_back(other.getEnd(), getEnd());
-      }
-    } else if (!other.contains(*this)) {
-      if (getBegin() <= other.getBegin()) {
-        results.emplace_back(getBegin(), other.getBegin());
-      } else {
-        results.emplace_back(other.getEnd(), getEnd());
-      }
-    }
-
-    return results;
-  }
-
-  Range::const_iterator Range::begin() const
-  {
-    return const_iterator(getBegin(), getEnd());
-  }
-
-  Range::const_iterator Range::end() const
-  {
-    return const_iterator(getEnd(), getEnd());
-  }
-
-  std::ostream& operator<<(std::ostream& stream, const Range& obj)
-  {
-    return stream << "[" << obj.getBegin() << "," << obj.getEnd() << ")";
-  }
-
-  Range::Iterator::Iterator(Point::data_type begin, Point::data_type end)
-      : current(begin), end(end)
+  RangeIterator::RangeIterator(int64_t begin, int64_t end) : current_(begin), end_(end)
   {
     assert(begin <= end);
   }
 
-  bool Range::Iterator::operator==(const Range::Iterator& other) const
+  RangeIterator RangeIterator::begin(const Range& range)
   {
-    return current == other.current && end == other.end;
+    return {range.begin, range.end};
   }
 
-  bool Range::Iterator::operator!=(const Range::Iterator& other) const
+  RangeIterator RangeIterator::end(const Range& range)
   {
-    return current != other.current || end != other.end;
+    return {range.end, range.end};
   }
 
-  Range::Iterator& Range::Iterator::operator++()
+  bool RangeIterator::operator==(const RangeIterator& it) const
   {
-    current = std::min(current + 1, end);
+    return current_ == it.current_ && end_ == it.end_;
+  }
+
+  bool RangeIterator::operator!=(const RangeIterator& it) const
+  {
+    return current_ != it.current_ || end_ != it.end_;
+  }
+
+  RangeIterator& RangeIterator::operator++()
+  {
+    current_ = std::min(current_ + 1, end_);
     return *this;
   }
 
-  Range::Iterator Range::Iterator::operator++(int)
+  RangeIterator RangeIterator::operator++(int)
   {
-    auto temp = *this;
-    current = std::min(current + 1, end);
+    RangeIterator temp = *this;
+    current_ = std::min(current_ + 1, end_);
     return temp;
   }
 
-  Range::Iterator::value_type Range::Iterator::operator*()
+  int64_t RangeIterator::operator*() const
   {
-    return current;
+    return current_;
   }
 }
