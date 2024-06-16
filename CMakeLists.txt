@@ -89,7 +89,7 @@ option(MARCO_USE_BUILTIN_SUNDIALS "Use built-in SUNDIALS libraries (to be built 
 
 if (MARCO_ENABLE_SUNDIALS)
     if (MARCO_USE_BUILTIN_SUNDIALS)
-        set(SUNDIALS_DIR "${SUNDIALS_PATH}/lib/cmake/sundials")
+        set(SUNDIALS_DIR "${SUNDIALS_PATH}/${CMAKE_INSTALL_LIBDIR}/cmake/sundials")
     endif()
 
     find_package(SUNDIALS)
