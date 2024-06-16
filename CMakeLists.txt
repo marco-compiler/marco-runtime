@@ -85,7 +85,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 # Find the SUNDIALS libraries.
 option(MARCO_ENABLE_SUNDIALS "Enable the usage of the SUNDIALS suite" ON)
-option(MARCO_USE_BUILTIN_SUNDIALS "Use built-in SUNDIALS libraries (to be built separately, see README)" ON)
+option(MARCO_USE_BUILTIN_SUNDIALS "Use built-in SUNDIALS libraries (to be built separately, see README)" OFF)
 
 if (MARCO_ENABLE_SUNDIALS)
     if (MARCO_USE_BUILTIN_SUNDIALS)
