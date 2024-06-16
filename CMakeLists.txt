@@ -119,13 +119,6 @@ if (MARCO_ENABLE_SUNDIALS)
         install(DIRECTORY ${SUNDIALS_INCLUDE_DIR} DESTINATION dependencies/sundials)
         install(DIRECTORY ${SUNDIALS_LIBRARY_DIR} DESTINATION dependencies/sundials)
     endif()
-
-    list(APPEND DEPENDENCIES_LIB_NAMES
-            sundials_ida
-            sundials_kinsol
-            sundials_nvecserial
-            sundials_sunlinsolklu
-            klu)
 endif()
 
 #------------------------------------------------------------------------------
