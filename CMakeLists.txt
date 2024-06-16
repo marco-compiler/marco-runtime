@@ -116,8 +116,6 @@ if (MARCO_ENABLE_SUNDIALS)
 
     if (MARCO_USE_BUILTIN_SUNDIALS)
         link_directories("${SUNDIALS_LIBRARY_DIR}")
-        install(DIRECTORY ${SUNDIALS_INCLUDE_DIR} DESTINATION dependencies/sundials)
-        install(DIRECTORY ${SUNDIALS_LIBRARY_DIR} DESTINATION dependencies/sundials)
     endif()
 endif()
 
