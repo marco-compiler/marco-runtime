@@ -100,23 +100,21 @@ if (MARCO_ENABLE_SUNDIALS)
         set(IDA_ENABLE OFF)
     endif()
 
-    if (NOT MARCO_USE_BUILTIN_SUNDIALS)
-        # Compute SUNDIALS installation prefix
+    if (MARCO_USE_BUILTIN_SUNDIALS)
+        set(SUNDIALS_LIBRARY_DIR ${SUNDIALS_PATH}/${CMAKE_INSTALL_LIBDIR})
+    else()
+        # Compute SUNDIALS installation prefix.
+        # The CMake configuration file is inside lib/cmake/sundials, so we need
+        # to go two folders up in the folders tree to get the path of the
+        # libraries.
         get_filename_component(SUNDIALS_PATH "${SUNDIALS_DIR}" PATH)
         get_filename_component(SUNDIALS_PATH "${SUNDIALS_PATH}" PATH)
-        get_filename_component(SUNDIALS_PATH "${SUNDIALS_PATH}" PATH)
 
-        if (SUNDIALS_PATH STREQUAL "/")
-            set(SUNDIALS_PATH "")
-        endif()
+        set(SUNDIALS_LIBRARY_DIR ${SUNDIALS_PATH})
     endif()
 
-    set(SUNDIALS_INCLUDE_DIR ${SUNDIALS_PATH}/include)
-    set(SUNDIALS_LIBRARY_DIR ${SUNDIALS_PATH}/lib)
-
-    if (MARCO_USE_BUILTIN_SUNDIALS)
-        link_directories("${SUNDIALS_LIBRARY_DIR}")
-    endif()
+    message("SUNDIALS libraries path: ${SUNDIALS_LIBRARY_DIR}")
+    link_directories("${SUNDIALS_LIBRARY_DIR}")
 endif()
 
 #------------------------------------------------------------------------------
