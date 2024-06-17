@@ -113,7 +113,7 @@ if (MARCO_ENABLE_SUNDIALS)
         set(SUNDIALS_LIBRARY_DIR ${SUNDIALS_PATH})
     endif()
 
-    message("SUNDIALS libraries path: ${SUNDIALS_LIBRARY_DIR}")
+    message(STATUS "SUNDIALS libraries path: ${SUNDIALS_LIBRARY_DIR}")
     link_directories("${SUNDIALS_LIBRARY_DIR}")
 endif()
 
