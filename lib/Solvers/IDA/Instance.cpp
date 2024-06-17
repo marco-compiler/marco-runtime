@@ -376,14 +376,21 @@ namespace marco::runtime::sundials::ida
       return true;
     }
 
+#if SUNDIALS_VERSION_MAJOR >= 6
     // Create the SUNDIALS context.
     if (SUNContext_Create(nullptr, &ctx) != 0) {
       return false;
     }
+#endif
 
     // Create and initialize the variables vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     variablesVector = N_VNew_Serial(
             static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    variablesVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(
             static_cast<void*>(variablesVector), "N_VNew_Serial"));
@@ -393,8 +400,13 @@ namespace marco::runtime::sundials::ida
     }
 
     // Create and initialize the derivatives vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     derivativesVector = N_VNew_Serial(
             static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    derivativesVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(
             static_cast<void*>(derivativesVector), "N_VNew_Serial"));
@@ -404,8 +416,13 @@ namespace marco::runtime::sundials::ida
     }
 
     // Create and initialize the IDs vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     idVector = N_VNew_Serial(
             static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    idVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(static_cast<void*>(idVector), "N_VNew_Serial"));
 
@@ -426,8 +443,13 @@ namespace marco::runtime::sundials::ida
     }
 
     // Create and initialize the tolerances vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     tolerancesVector = N_VNew_Serial(
             static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    tolerancesVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(
             static_cast<void*>(tolerancesVector), "N_VNew_Serial"));
@@ -608,7 +630,11 @@ namespace marco::runtime::sundials::ida
     copyVariablesFromMARCO(variablesVector, derivativesVector);
 
     // Create and initialize the memory for IDA.
+#if SUNDIALS_VERSION_MAJOR >= 6
     idaMemory = IDACreate(ctx);
+#else
+    idaMemory = IDACreate();
+#endif
 
     if (!checkAllocation(idaMemory, "IDACreate")) {
       return false;
@@ -623,12 +649,20 @@ namespace marco::runtime::sundials::ida
     }
 
     // Create sparse SUNMatrix for use in linear solver.
+#if SUNDIALS_VERSION_MAJOR >= 6
     sparseMatrix = SUNSparseMatrix(
         static_cast<sunindextype>(scalarEquationsNumber),
         static_cast<sunindextype>(scalarEquationsNumber),
         static_cast<sunindextype>(nonZeroValuesNumber),
         CSR_MAT,
         ctx);
+#else
+    sparseMatrix = SUNSparseMatrix(
+        static_cast<sunindextype>(scalarEquationsNumber),
+        static_cast<sunindextype>(scalarEquationsNumber),
+        static_cast<sunindextype>(nonZeroValuesNumber),
+        CSR_MAT);
+#endif
 
     if (!checkAllocation(
             static_cast<void*>(sparseMatrix), "SUNSparseMatrix")) {
@@ -636,7 +670,11 @@ namespace marco::runtime::sundials::ida
     }
 
     // Create and attach a KLU SUNLinearSolver object.
+#if SUNDIALS_VERSION_MAJOR >= 6
     linearSolver = SUNLinSol_KLU(variablesVector, sparseMatrix, ctx);
+#else
+    linearSolver = SUNLinSol_KLU(variablesVector, sparseMatrix);
+#endif
 
     if (!checkAllocation(static_cast<void*>(linearSolver), "SUNLinSol_KLU")) {
       return false;
@@ -1710,6 +1748,7 @@ namespace marco::runtime::sundials::ida
 
   bool IDAInstance::idaSetMinStepSize()
   {
+#if SUNDIALS_VERSION_MAJOR >= 6 && SUNDIALS_VERSION_MINOR >= 2
     auto retVal = IDASetMinStep(idaMemory, getOptions().minStepSize);
 
     if (retVal == IDA_MEM_NULL) {
@@ -1723,6 +1762,9 @@ namespace marco::runtime::sundials::ida
     }
 
     return retVal == IDA_SUCCESS;
+#else
+    return true;
+#endif
   }
 
   bool IDAInstance::idaSetMaxStepSize()

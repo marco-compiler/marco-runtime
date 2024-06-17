@@ -263,14 +263,21 @@ namespace marco::runtime::sundials::kinsol
       return true;
     }
 
+#if SUNDIALS_VERSION_MAJOR >= 6
     // Create the SUNDIALS context.
     if (SUNContext_Create(nullptr, &ctx) != 0) {
       return false;
     }
+#endif
 
     // Create and initialize the variables vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     variablesVector = N_VNew_Serial(
         static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    variablesVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(
         static_cast<void*>(variablesVector), "N_VNew_Serial"));
@@ -280,8 +287,13 @@ namespace marco::runtime::sundials::kinsol
     }
 
     // Create and initialize the tolerances vector.
+#if SUNDIALS_VERSION_MAJOR >= 6
     tolerancesVector = N_VNew_Serial(
         static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    tolerancesVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     assert(checkAllocation(
         static_cast<void*>(tolerancesVector), "N_VNew_Serial"));
@@ -299,11 +311,21 @@ namespace marco::runtime::sundials::kinsol
       }
     }
 
+#if SUNDIALS_VERSION_MAJOR >= 6
     variableScaleVector = N_VNew_Serial(
         static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    variableScaleVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
+#if SUNDIALS_VERSION_MAJOR >= 6
     residualScaleVector = N_VNew_Serial(
         static_cast<sunindextype>(scalarVariablesNumber), ctx);
+#else
+    residualScaleVector = N_VNew_Serial(
+        static_cast<sunindextype>(scalarVariablesNumber));
+#endif
 
     for (uint64_t i = 0; i < scalarVariablesNumber; ++i) {
       N_VGetArrayPointer(variableScaleVector)[i] = 1;
@@ -447,7 +469,11 @@ namespace marco::runtime::sundials::kinsol
     computeThreadChunks();
 
     // Create and initialize the memory for KINSOL.
+#if SUNDIALS_VERSION_MAJOR >= 6
     kinsolMemory = KINCreate(ctx);
+#else
+    kinsolMemory = KINCreate();
+#endif
 
     if (!checkAllocation(kinsolMemory, "KINCreate")) {
       return false;
@@ -458,12 +484,20 @@ namespace marco::runtime::sundials::kinsol
     }
 
     // Create sparse SUNMatrix for use in linear solver.
+#if SUNDIALS_VERSION_MAJOR >= 6
     sparseMatrix = SUNSparseMatrix(
         static_cast<sunindextype>(scalarEquationsNumber),
         static_cast<sunindextype>(scalarEquationsNumber),
         static_cast<sunindextype>(nonZeroValuesNumber),
         CSR_MAT,
         ctx);
+#else
+    sparseMatrix = SUNSparseMatrix(
+        static_cast<sunindextype>(scalarEquationsNumber),
+        static_cast<sunindextype>(scalarEquationsNumber),
+        static_cast<sunindextype>(nonZeroValuesNumber),
+        CSR_MAT);
+#endif
 
     if (!checkAllocation(
             static_cast<void*>(sparseMatrix), "SUNSparseMatrix")) {
@@ -471,7 +505,11 @@ namespace marco::runtime::sundials::kinsol
     }
 
     // Create and attach a KLU SUNLinearSolver object.
+#if SUNDIALS_VERSION_MAJOR >= 6
     linearSolver = SUNLinSol_KLU(variablesVector, sparseMatrix, ctx);
+#else
+    linearSolver = SUNLinSol_KLU(variablesVector, sparseMatrix);
+#endif
 
     if (!checkAllocation(static_cast<void*>(linearSolver), "SUNLinSol_KLU")) {
       return false;

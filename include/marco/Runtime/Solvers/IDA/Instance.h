@@ -256,8 +256,10 @@ namespace marco::runtime::sundials::ida
       /// }
 
     private:
+#if SUNDIALS_VERSION_MAJOR >= 6
       // SUNDIALS context.
       SUNContext ctx{nullptr};
+#endif
 
       // Whether the instance has been inizialized or not.
       bool initialized{false};
