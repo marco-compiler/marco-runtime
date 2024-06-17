@@ -330,7 +330,7 @@ namespace marco::runtime::sundials
     return getIndicesFromFlatIndex(flatIndex, result, ranges);
   }
 
-  sunrealtype getCellFromSparseMatrix(
+  double getCellFromSparseMatrix(
       SUNMatrix matrix,
       uint64_t rowIndex,
       uint64_t columnIndex)

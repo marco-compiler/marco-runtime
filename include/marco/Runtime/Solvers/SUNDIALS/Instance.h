@@ -174,7 +174,7 @@ namespace marco::runtime::sundials
       const MultidimensionalRange& ranges);
 
   // Highly inefficient, use only for debug purposes.
-  sunrealtype getCellFromSparseMatrix(
+  double getCellFromSparseMatrix(
       SUNMatrix matrix,
       uint64_t rowIndex,
       uint64_t columnIndex);

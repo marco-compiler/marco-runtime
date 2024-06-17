@@ -2051,7 +2051,7 @@ namespace marco::runtime::sundials::ida
   }
 
   // Highly inefficient, use only for debug purposes.
-  static sunrealtype getCellFromSparseMatrix(
+  static double getCellFromSparseMatrix(
       SUNMatrix matrix,
       uint64_t rowIndex,
       uint64_t columnIndex)
