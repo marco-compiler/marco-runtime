@@ -3338,3 +3338,11 @@ TEST(Runtime, zeros_f64)
   EXPECT_DOUBLE_EQ(array[1][0], 0);
   EXPECT_DOUBLE_EQ(array[1][1], 0);
 }
+
+TEST(Runtime, assert_i1)
+{
+    bool (*func)(bool) = NAME_MANGLED(assert, bool, bool);
+
+    EXPECT_FALSE(func(false));
+    EXPECT_TRUE(func(true));
+}

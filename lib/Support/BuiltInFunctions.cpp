@@ -1304,3 +1304,22 @@ RUNTIME_FUNC_DEF(zeros, void, ARRAY(int32_t))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(int64_t))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(float))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(double))
+
+
+//===----------------------------------------------------------------------===//
+// zeros
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+    bool assert_i1(bool condition) {
+
+        // If the condition is false, terminate the program
+
+        exit(EXIT_FAILURE);
+
+    }
+
+}
+
+RUNTIME_FUNC_DEF(assert, bool, bool)
