@@ -10,6 +10,10 @@
 #include "sunmatrix/sunmatrix_sparse.h"
 #include <vector>
 
+#if SUNDIALS_VERSION_MAJOR >= 7
+#include "sundials/sundials_types_deprecated.h"
+#endif
+
 namespace marco::runtime::sundials
 {
   class VariableIndicesIterator;

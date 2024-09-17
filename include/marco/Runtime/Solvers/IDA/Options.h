@@ -5,6 +5,10 @@
 
 #include "ida/ida.h"
 
+#if SUNDIALS_VERSION_MAJOR >= 7
+#include "sundials/sundials_types_deprecated.h"
+#endif
+
 namespace marco::runtime::sundials::ida
 {
   struct Options
