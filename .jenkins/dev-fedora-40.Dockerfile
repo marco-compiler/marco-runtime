@@ -23,6 +23,6 @@ RUN chmod +x /tmp/install_llvm.sh && \
     /tmp/install_llvm.sh
 
 RUN dnf update -y && \
-    dnf install -y penblas-devel-0.3.26-4.fc40 \
+    dnf install -y openblas-devel-0.3.26-4.fc40 \
     suitesparse-devel-7.6.0-1.fc40 \
     sundials-devel-6.6.2-7.fc40
