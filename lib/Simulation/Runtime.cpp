@@ -270,6 +270,7 @@ namespace
   dynamicModelEnd();
   SIMULATION_PROFILER_DYNAMIC_MODEL_STOP;
 
+
   // Tell the printer that the simulation has finished.
   simulation.getPrinter()->simulationEnd();
 

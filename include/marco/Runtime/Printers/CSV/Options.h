@@ -7,6 +7,7 @@ namespace marco::runtime::printing
   {
     bool scientificNotation = false;
     unsigned int precision = 9;
+    bool disablePrinting = false;
   };
 
   PrintOptions& printOptions();
