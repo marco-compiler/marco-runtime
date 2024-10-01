@@ -8,17 +8,19 @@ std::string CommandLineOptions::getTitle() const { return "Formatting"; }
 
 void CommandLineOptions::printCommandLineOptions(std::ostream &os) const {
   // clang-format off
-  os << "  --scientific-notation    Print the values using the scientific notation." << std::endl;
-  os << "  --precision=<value>      Set the number of decimals to be printed. Defaults to " << printOptions().precision << "." << std::endl;
+  os << "  --scientific-notation             Print the values using the scientific notation." << std::endl;
+  os << "  --precision=<value>               Set the number of decimals to be printed. Defaults to " << printOptions().precision << "." << std::endl;
+  os << "  --snapshot-frequency=<value>      The frequency at which to print the current simulation state. Defaults every " << printOptions().snapshotFrequency << " timesteps." << std::endl;
   // clang-format on
 }
 
 void CommandLineOptions::parseCommandLineOptions(
     const argh::parser &options) const {
-  // clang-format off
-  printOptions().scientificNotation = options["scientific-notation"];
-  options("precision") >> printOptions().precision;
-  // clang-format on
+    // clang-format off
+    printOptions().scientificNotation = options["scientific-notation"];
+    options("snapshot-frequency") >> printOptions().snapshotFrequency;
+    options("precision") >> printOptions().precision;
+    // clang-format on
 }
 } // namespace marco::runtime::printing
 

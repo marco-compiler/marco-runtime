@@ -34,6 +34,10 @@ namespace marco::runtime
 
       std::vector<int64_t> derOrders;
 
+
+    public:
+        unsigned int iterationNum = 0;
+
     private:
       Printer* printer;
   };

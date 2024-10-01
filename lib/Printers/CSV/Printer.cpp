@@ -135,6 +135,9 @@ static void printValues(const Simulation& simulation)
   auto& options = printOptions();
   std::cout.precision(options.precision);
 
+  // Handle snapshot frequency.
+  if ( simulation.iterationNum % options.snapshotFrequency > 0 ) return;
+
   if (options.scientificNotation) {
     std::cout << std::scientific;
   } else {
