@@ -1539,6 +1539,21 @@ namespace marco::runtime::sundials::ida
           std::vector<int64_t> equationIndices = std::get<1>(chunk);
 
           do {
+            assert([&]() -> bool {
+              if (equationIndices.size() != equationRanges[equation].size()) {
+                return false;
+              }
+
+              for (size_t i = 0, rank = equationIndices.size(); i < rank; ++i) {
+                if (equationIndices[i] < equationRanges[equation][i].begin ||
+                    equationIndices[i] >= equationRanges[equation][i].end) {
+                  return false;
+                }
+              }
+
+              return true;
+            }() && "Invalid equation indices");
+
               processFn(equation, equationIndices);
           } while (advanceEquationIndicesUntil(
               equationIndices, equationRanges[equation], std::get<2>(chunk)));
