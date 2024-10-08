@@ -119,13 +119,13 @@ namespace marco::runtime::sundials::kinsol
 
       void computeNNZ();
 
-      void computeThreadChunks();
+      void computeResidualThreadChunks();
 
       void copyVariablesFromMARCO(N_Vector variables);
 
       void copyVariablesIntoMARCO(N_Vector variables);
 
-      void equationsParallelIteration(
+      void residualsParallelIteration(
           std::function<void(
               Equation equation,
               const std::vector<int64_t>& equationIndices)> processFn);
@@ -259,19 +259,20 @@ namespace marco::runtime::sundials::kinsol
       // Thread pool.
       ThreadPool threadPool;
 
-      // A chunk of equations to be processed by a thread.
+      // A chunk of equations to be processed by a thread while computing the
+      // residual values.
       // A chunk is composed of:
       //   - the identifier (position) of the equation.
       //   - the begin indices (included)
       //   - the end indices (exluded)
-      using ThreadEquationsChunk = std::tuple<
+      using ResidualThreadEquationsChunk = std::tuple<
           Equation, std::vector<int64_t>, std::vector<int64_t>>;
 
       // The list of chunks the threads will process. Each thread elaborates
       // one chunk at a time.
       // The information is computed only once during the initialization to
       // save time during the actual simulation.
-      std::vector<ThreadEquationsChunk> threadEquationsChunks;
+      std::vector<ResidualThreadEquationsChunk> residualThreadEquationsChunks;
   };
 }
 

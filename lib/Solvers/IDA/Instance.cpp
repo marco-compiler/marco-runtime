@@ -592,8 +592,8 @@ bool IDAInstance::initialize() {
   // Compute the total amount of non-zero values in the Jacobian Matrix.
   computeNNZ();
 
-  // Compute the equation chunks for each thread.
-  computeThreadChunks();
+  // Compute the workload for each thread.
+  computeResidualThreadChunks();
 
   // Initialize the values of the variables living inside IDA.
   copyVariablesFromMARCO(variablesVector, derivativesVector);
@@ -887,7 +887,7 @@ int IDAInstance::residualFunction(realtype time, N_Vector variables,
   // it writes into.
   IDA_PROFILER_RESIDUALS_START;
 
-  instance->equationsParallelIteration(
+  instance->residualsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices) {
         uint64_t equationRank = instance->getEquationRank(eq);
         assert(equationIndices.size() == equationRank);
@@ -952,13 +952,23 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
   // the current iteration values.
   instance->copyVariablesIntoMARCO(variables, derivatives);
 
-  // For every vectorized equation, compute its row within the Jacobian
-  // matrix.
   IDA_PROFILER_PARTIAL_DERIVATIVES_START;
 
-  instance->equationsParallelIteration(
-      [&](Equation eq, const std::vector<int64_t> &equationIndices) {
-        Variable writtenVariable = instance->getWrittenVariable(eq);
+  unsigned int numOfThreads = instance->threadPool.getNumOfThreads();
+
+  std::atomic_size_t currentEquation = 0;
+  uint64_t numOfVectorizedEquations = instance->getNumOfVectorizedEquations();
+
+  for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
+    instance->threadPool.async([&]() {
+      size_t equationIndex = 0;
+      Equation equation;
+      std::vector<int64_t> equationIndices;
+
+      while ((equationIndex = currentEquation++) < numOfVectorizedEquations) {
+        equation = instance->equationsProcessingOrder[equationIndex];
+        instance->getEquationBeginIndices(equation, equationIndices);
+        Variable writtenVariable = instance->getWrittenVariable(equation);
 
         uint64_t writtenVariableArrayOffset =
             instance->variableOffsets[writtenVariable];
@@ -970,52 +980,62 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
         writtenVariableIndices.resize(writtenVariableRank, 0);
 
         AccessFunction writeAccessFunction =
-            instance->getWriteAccessFunction(eq);
+            instance->getWriteAccessFunction(equation);
 
-        writeAccessFunction(equationIndices.data(),
-                            writtenVariableIndices.data());
+        do {
+          writeAccessFunction(equationIndices.data(),
+                              writtenVariableIndices.data());
 
-        uint64_t writtenVariableScalarOffset =
-            getVariableFlatIndex(instance->variablesDimensions[writtenVariable],
-                                 writtenVariableIndices);
+          uint64_t writtenVariableScalarOffset = getVariableFlatIndex(
+              instance->variablesDimensions[writtenVariable],
+              writtenVariableIndices);
 
-        uint64_t scalarEquationIndex =
-            writtenVariableArrayOffset + writtenVariableScalarOffset;
+          uint64_t scalarEquationIndex =
+              writtenVariableArrayOffset + writtenVariableScalarOffset;
 
-        assert(scalarEquationIndex < instance->getNumOfScalarEquations());
+          assert(scalarEquationIndex < instance->getNumOfScalarEquations());
 
-        // Compute the column indexes that may be non-zeros.
-        std::vector<JacobianColumn> jacobianColumns =
-            instance->computeJacobianColumns(eq, equationIndices.data());
+          // Compute the column indices that may be non-zero.
+          std::vector<JacobianColumn> jacobianColumns =
+              instance->computeJacobianColumns(equation,
+                                               equationIndices.data());
 
-        // For every scalar variable with respect to which the equation must be
-        // partially differentiated.
-        for (size_t i = 0, e = jacobianColumns.size(); i < e; ++i) {
-          const JacobianColumn &column = jacobianColumns[i];
-          Variable variable = column.first;
-          const auto &variableIndices = column.second;
+          // For every scalar variable with respect to which the equation must
+          // be partially differentiated.
+          for (size_t i = 0, e = jacobianColumns.size(); i < e; ++i) {
+            const JacobianColumn &column = jacobianColumns[i];
+            Variable variable = column.first;
+            const auto &variableIndices = column.second;
 
-          uint64_t variableArrayOffset = instance->variableOffsets[variable];
+            uint64_t variableArrayOffset = instance->variableOffsets[variable];
 
-          uint64_t variableScalarOffset = getVariableFlatIndex(
-              instance->variablesDimensions[variable], column.second);
+            uint64_t variableScalarOffset = getVariableFlatIndex(
+                instance->variablesDimensions[variable], column.second);
 
-          assert(instance->jacobianFunctions[eq][variable] != nullptr);
+            assert(instance->jacobianFunctions[equation][variable] != nullptr);
 
-          auto jacobianFunctionResult =
-              instance->jacobianFunctions[eq][variable](
-                  time, equationIndices.data(), variableIndices.data(), alpha);
+            auto jacobianFunctionResult =
+                instance->jacobianFunctions[equation][variable](
+                    time, equationIndices.data(), variableIndices.data(),
+                    alpha);
 
-          instance->jacobianMatrixData[scalarEquationIndex][i].second =
-              jacobianFunctionResult;
+            instance->jacobianMatrixData[scalarEquationIndex][i].second =
+                jacobianFunctionResult;
 
-          auto index = static_cast<sunindextype>(variableArrayOffset +
-                                                 variableScalarOffset);
+            auto index = static_cast<sunindextype>(variableArrayOffset +
+                                                   variableScalarOffset);
 
-          instance->jacobianMatrixData[scalarEquationIndex][i].first = index;
-        }
-      });
+            instance->jacobianMatrixData[scalarEquationIndex][i].first = index;
+          }
+        } while (advanceEquationIndices(equationIndices,
+                                        instance->equationRanges[equation]));
+      }
+    });
+  }
 
+  instance->threadPool.wait();
+
+  // Move the partial derivatives into the SUNDIALS sparse matrix.
   sunindextype *rowPtrs = SUNSparseMatrix_IndexPointers(jacobianMatrix);
   sunindextype *columnIndices = SUNSparseMatrix_IndexValues(jacobianMatrix);
 
@@ -1222,7 +1242,7 @@ void IDAInstance::computeNNZ() {
   }
 }
 
-void IDAInstance::computeThreadChunks() {
+void IDAInstance::computeResidualThreadChunks() {
   unsigned int numOfThreads = threadPool.getNumOfThreads();
 
   int64_t chunksFactor = getOptions().equationsChunksFactor;
@@ -1262,8 +1282,8 @@ void IDAInstance::computeThreadChunks() {
                                         equationRanges[equation]);
       }
 
-      threadEquationsChunks.emplace_back(equation, std::move(beginIndices),
-                                         std::move(endIndices));
+      residualThreadEquationsChunks.emplace_back(
+          equation, std::move(beginIndices), std::move(endIndices));
 
       // Move to the next chunk.
       equationFlatIndex = endFlatIndex;
@@ -1409,85 +1429,7 @@ void IDAInstance::copyVariablesIntoMARCO(
   IDA_PROFILER_COPY_VARS_INTO_MARCO_STOP;
 }
 
-void IDAInstance::vectorEquationsParallelIteration(
-    std::function<void(Equation equation)> processFn) {
-  std::mutex mutex;
-  size_t processedEquations = 0;
-
-  // Function to move to the next equation.
-  auto getEquationAndAdvance = [&](Equation &eq) {
-    std::lock_guard<std::mutex> lockGuard(mutex);
-
-    if (processedEquations >= getNumOfVectorizedEquations()) {
-      return false;
-    }
-
-    eq = equationsProcessingOrder[processedEquations++];
-    return true;
-  };
-
-  for (unsigned int i = 0, e = threadPool.getNumOfThreads(); i < e; ++i) {
-    threadPool.async([&]() {
-      Equation equation;
-
-      while (getEquationAndAdvance(equation)) {
-        processFn(equation);
-      }
-    });
-  }
-
-  threadPool.wait();
-}
-
-void IDAInstance::scalarEquationsParallelIteration(
-    std::function<void(Equation equation,
-                       const std::vector<int64_t> &equationIndices)>
-        processFn) {
-  size_t processedEquations = 0;
-  std::vector<int64_t> equationIndices;
-  std::mutex mutex;
-
-  // Function to advance the indices by one, or move to the next equation if
-  // the current one has been fully visited.
-  auto getEquationAndAdvance = [&](Equation &eq,
-                                   std::vector<int64_t> &indices) {
-    std::lock_guard<std::mutex> lockGuard(mutex);
-
-    if (processedEquations >= getNumOfVectorizedEquations()) {
-      return false;
-    }
-
-    eq = equationsProcessingOrder[processedEquations];
-    indices = equationIndices;
-
-    if (!advanceEquationIndices(equationIndices, equationRanges[eq])) {
-      if (++processedEquations < getNumOfVectorizedEquations()) {
-        getEquationBeginIndices(equationsProcessingOrder[processedEquations],
-                                equationIndices);
-      }
-    }
-
-    return true;
-  };
-
-  getEquationBeginIndices(equationsProcessingOrder[processedEquations],
-                          equationIndices);
-
-  for (unsigned int i = 0, e = threadPool.getNumOfThreads(); i < e; ++i) {
-    threadPool.async([&]() {
-      Equation equation;
-      std::vector<int64_t> indices;
-
-      while (getEquationAndAdvance(equation, indices)) {
-        processFn(equation, indices);
-      }
-    });
-  }
-
-  threadPool.wait();
-}
-
-void IDAInstance::equationsParallelIteration(
+void IDAInstance::residualsParallelIteration(
     std::function<void(Equation equation,
                        const std::vector<int64_t> &equationIndices)>
         processFn) {
@@ -1499,9 +1441,10 @@ void IDAInstance::equationsParallelIteration(
     threadPool.async([&]() {
       size_t assignedChunk;
 
-      while ((assignedChunk = chunkIndex++) < threadEquationsChunks.size()) {
-        const ThreadEquationsChunk &chunk =
-            threadEquationsChunks[assignedChunk];
+      while ((assignedChunk = chunkIndex++) <
+             residualThreadEquationsChunks.size()) {
+        const ResidualThreadEquationsChunk &chunk =
+            residualThreadEquationsChunks[assignedChunk];
 
         Equation equation = std::get<0>(chunk);
         std::vector<int64_t> equationIndices = std::get<1>(chunk);
