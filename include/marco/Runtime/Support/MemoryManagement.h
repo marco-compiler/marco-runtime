@@ -7,11 +7,10 @@
 #include <memory>
 #include <vector>
 
-extern "C"
-{
-  void* marco_malloc(int64_t size);
-  void* marco_realloc(void* ptr, int64_t size);
-  void marco_free(void* ptr);
+extern "C" {
+void *marco_malloc(int64_t size);
+void *marco_realloc(void *ptr, int64_t size);
+void marco_free(void *ptr);
 };
 
 namespace marco::runtime {
@@ -19,22 +18,22 @@ class MemoryPool {
 public:
   MemoryPool() = default;
 
-  MemoryPool(const MemoryPool& other) = delete;
+  MemoryPool(const MemoryPool &other) = delete;
 
-  MemoryPool(MemoryPool&& other) = default;
+  MemoryPool(MemoryPool &&other) = default;
 
   ~MemoryPool();
 
-  MemoryPool& operator=(const MemoryPool& other) = delete;
+  MemoryPool &operator=(const MemoryPool &other) = delete;
 
-  MemoryPool& operator=(MemoryPool&& other) = default;
+  MemoryPool &operator=(MemoryPool &&other) = default;
 
-  double* get(uint64_t id) const;
+  double *get(uint64_t id) const;
 
   uint64_t create(size_t numOfElements);
 
 private:
-  std::vector<double*> buffers;
+  std::vector<double *> buffers;
 };
 
 class MemoryPoolManager {
@@ -42,26 +41,26 @@ private:
   MemoryPoolManager() = default;
 
 public:
-  static MemoryPoolManager& getInstance();
+  static MemoryPoolManager &getInstance();
 
-  MemoryPoolManager(const MemoryPoolManager& other) = delete;
+  MemoryPoolManager(const MemoryPoolManager &other) = delete;
 
-  MemoryPoolManager(MemoryPoolManager&& other) = default;
+  MemoryPoolManager(MemoryPoolManager &&other) = default;
 
   ~MemoryPoolManager() = default;
 
-  MemoryPoolManager& operator=(const MemoryPoolManager& other) = delete;
+  MemoryPoolManager &operator=(const MemoryPoolManager &other) = delete;
 
-  MemoryPoolManager& operator=(MemoryPoolManager&& other) = default;
+  MemoryPoolManager &operator=(MemoryPoolManager &&other) = default;
 
-  MemoryPool& get(uint64_t pool) const;
+  MemoryPool &get(uint64_t pool) const;
 
   uint64_t create();
 
 private:
   std::vector<std::unique_ptr<MemoryPool>> pools{};
 };
-}
+} // namespace marco::runtime
 
 RUNTIME_FUNC_DECL(memoryPoolGet, PTR(void), int64_t, int64_t)
 

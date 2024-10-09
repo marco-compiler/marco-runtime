@@ -32,12 +32,13 @@ using ResidualFunction = double (*)(double, const int64_t *);
 /// The 6th argument is a pointer to the list of AD seed identifiers
 /// The result is the Jacobian value.
 using JacobianFunction = double (*)(double, const int64_t *, const uint64_t *,
-                                    double, uint64_t, const uint64_t*);
+                                    double, uint64_t, const uint64_t *);
 
 /// A descriptor of a Jacobian function is a pair of value consisting in:
 ///  - the function pointer
 ///  - the number of elements of each AD seed
-using JacobianFunctionDescriptor = std::pair<JacobianFunction, std::vector<uint64_t>>;
+using JacobianFunctionDescriptor =
+    std::pair<JacobianFunction, std::vector<uint64_t>>;
 
 /// A map indicating the IDs of the buffers living inside the memory pool to
 /// be used as AD seeds for each Jacobian function.
@@ -51,8 +52,8 @@ using JacobianSeedsMap = std::map<JacobianFunction, std::vector<uint64_t>>;
 ///   - the end indices (excluded)
 ///   - the map indicating the buffer IDs to be used when computing the
 ///     partial derivatives
-using ThreadEquationsChunk =
-    std::tuple<Equation, std::vector<int64_t>, std::vector<int64_t>, JacobianSeedsMap>;
+using ThreadEquationsChunk = std::tuple<Equation, std::vector<int64_t>,
+                                        std::vector<int64_t>, JacobianSeedsMap>;
 
 class IDAInstance {
 public:
@@ -94,7 +95,7 @@ public:
   /// equation.
   void addJacobianFunction(Equation equationIndex, Variable variableIndex,
                            JacobianFunction jacobianFunction,
-                           uint64_t numOfSeeds, uint64_t* seedSizes);
+                           uint64_t numOfSeeds, uint64_t *seedSizes);
 
   /// Instantiate and initialize all the classes needed by IDA in order to
   /// solve the given system of equations. It also sets optional simulation
@@ -162,7 +163,9 @@ private:
 
   [[nodiscard]] uint64_t getVariableRank(Variable variable) const;
 
-  void iterateAccessedArrayVariables(Equation equation, std::function<void(Variable)> callback) const;
+  void
+  iterateAccessedArrayVariables(Equation equation,
+                                std::function<void(Variable)> callback) const;
 
   std::vector<JacobianColumn>
   computeJacobianColumns(Equation eq, const int64_t *equationIndices) const;
@@ -180,7 +183,7 @@ private:
   void equationsParallelIteration(
       std::function<void(Equation equation,
                          const std::vector<int64_t> &equationIndices,
-                         const JacobianSeedsMap& jacobianSeedsMap)>
+                         const JacobianSeedsMap &jacobianSeedsMap)>
           processFn);
 
   void getVariableBeginIndices(Variable variable,
