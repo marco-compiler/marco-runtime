@@ -5,6 +5,7 @@
 #include "marco/Runtime/Simulation/Options.h"
 #include "marco/Runtime/Solvers/KINSOL/Options.h"
 #include "marco/Runtime/Solvers/KINSOL/Profiler.h"
+#include "marco/Runtime/Support/MemoryManagement.h"
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -205,7 +206,9 @@ void KINSOLInstance::setResidualFunction(Equation equation,
 }
 
 void KINSOLInstance::addJacobianFunction(Equation equation, Variable variable,
-                                         JacobianFunction jacobianFunction) {
+                                         JacobianFunction jacobianFunction,
+                                         uint64_t numOfSeeds,
+                                         uint64_t *seedSizes) {
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Setting jacobian function for equation " << equation
               << " and variable " << variable
@@ -218,10 +221,17 @@ void KINSOLInstance::addJacobianFunction(Equation equation, Variable variable,
   }
 
   if (jacobianFunctions[equation].size() <= variable) {
-    jacobianFunctions[equation].resize(variable + 1, nullptr);
+    jacobianFunctions[equation].resize(
+        variable + 1, std::make_pair(nullptr, std::vector<uint64_t>{}));
   }
 
-  jacobianFunctions[equation][variable] = jacobianFunction;
+  jacobianFunctions[equation][variable].first = jacobianFunction;
+  jacobianFunctions[equation][variable].second.resize(numOfSeeds);
+
+  for (uint64_t i = 0; i < numOfSeeds; ++i) {
+    assert(seedSizes[i] != 0);
+    jacobianFunctions[equation][variable].second[i] = seedSizes[i];
+  }
 }
 
 bool KINSOLInstance::initialize() {
@@ -230,6 +240,8 @@ bool KINSOLInstance::initialize() {
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Performing initialization" << std::endl;
   }
+
+  memoryPoolId = MemoryPoolManager::getInstance().create();
 
   // Compute the number of scalar variables.
   scalarVariablesNumber = 0;
@@ -360,15 +372,16 @@ bool KINSOLInstance::initialize() {
 
   assert(precomputedAccesses ||
          std::all_of(jacobianFunctions.begin(), jacobianFunctions.end(),
-                     [&](std::vector<JacobianFunction> functions) {
+                     [&](std::vector<JacobianFunctionDescriptor> functions) {
                        if (functions.size() != variableGetters.size()) {
                          return false;
                        }
 
-                       return std::all_of(functions.begin(), functions.end(),
-                                          [](const JacobianFunction &function) {
-                                            return function != nullptr;
-                                          });
+                       return std::all_of(
+                           functions.begin(), functions.end(),
+                           [](const JacobianFunctionDescriptor &function) {
+                             return function.first != nullptr;
+                           });
                      }));
 
   // Check that all the getters and setters have been set.
@@ -449,7 +462,7 @@ bool KINSOLInstance::initialize() {
   computeNNZ();
 
   // Compute the equation chunks for each thread.
-  computeResidualThreadChunks();
+  computeThreadChunks();
 
   // Create and initialize the memory for KINSOL.
 #if SUNDIALS_VERSION_MAJOR >= 6
@@ -559,8 +572,9 @@ int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
   // it writes into.
   KINSOL_PROFILER_RESIDUALS_START;
 
-  instance->residualsParallelIteration(
-      [&](Equation eq, const std::vector<int64_t> &equationIndices) {
+  instance->equationsParallelIteration(
+      [&](Equation eq, const std::vector<int64_t> &equationIndices,
+          const JacobianSeedsMap &jacobianSeedsMap) {
         uint64_t equationRank = instance->getEquationRank(eq);
         assert(equationIndices.size() == equationRank);
 
@@ -622,21 +636,10 @@ int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
 
   KINSOL_PROFILER_PARTIAL_DERIVATIVES_START;
 
-  unsigned int numOfThreads = instance->threadPool.getNumOfThreads();
-
-  std::atomic_size_t currentEquation = 0;
-  uint64_t numOfVectorizedEquations = instance->getNumOfVectorizedEquations();
-
-  for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
-    instance->threadPool.async([&]() {
-      size_t equationIndex = 0;
-      Equation equation;
-      std::vector<int64_t> equationIndices;
-
-      while ((equationIndex = currentEquation++) < numOfVectorizedEquations) {
-        equation = instance->equationsProcessingOrder[equationIndex];
-        instance->getEquationBeginIndices(equation, equationIndices);
-        Variable writtenVariable = instance->getWrittenVariable(equation);
+  instance->equationsParallelIteration(
+      [&](Equation eq, const std::vector<int64_t> &equationIndices,
+          const JacobianSeedsMap &jacobianSeedsMap) {
+        Variable writtenVariable = instance->getWrittenVariable(eq);
 
         uint64_t writtenVariableArrayOffset =
             instance->variableOffsets[writtenVariable];
@@ -648,60 +651,58 @@ int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
         writtenVariableIndices.resize(writtenVariableRank, 0);
 
         AccessFunction writeAccessFunction =
-            instance->getWriteAccessFunction(equation);
+            instance->getWriteAccessFunction(eq);
 
-        do {
-          writeAccessFunction(equationIndices.data(),
-                              writtenVariableIndices.data());
+        writeAccessFunction(equationIndices.data(),
+                            writtenVariableIndices.data());
 
-          uint64_t writtenVariableScalarOffset = getVariableFlatIndex(
-              instance->variablesDimensions[writtenVariable],
-              writtenVariableIndices);
+        uint64_t writtenVariableScalarOffset =
+            getVariableFlatIndex(instance->variablesDimensions[writtenVariable],
+                                 writtenVariableIndices);
 
-          uint64_t scalarEquationIndex =
-              writtenVariableArrayOffset + writtenVariableScalarOffset;
+        uint64_t scalarEquationIndex =
+            writtenVariableArrayOffset + writtenVariableScalarOffset;
 
-          assert(scalarEquationIndex < instance->getNumOfScalarEquations());
+        assert(scalarEquationIndex < instance->getNumOfScalarEquations());
 
-          // Compute the column indices that may be non-zero.
-          std::vector<JacobianColumn> jacobianColumns =
-              instance->computeJacobianColumns(equation,
-                                               equationIndices.data());
+        // Compute the column indexes that may be non-zeros.
+        std::vector<JacobianColumn> jacobianColumns =
+            instance->computeJacobianColumns(eq, equationIndices.data());
 
-          // For every scalar variable with respect to which the equation must
-          // be partially differentiated.
-          for (size_t i = 0, e = jacobianColumns.size(); i < e; ++i) {
-            const JacobianColumn &column = jacobianColumns[i];
-            Variable variable = column.first;
-            const auto &variableIndices = column.second;
+        // For every scalar variable with respect to which the equation must be
+        // partially differentiated.
+        for (size_t i = 0, e = jacobianColumns.size(); i < e; ++i) {
+          const JacobianColumn &column = jacobianColumns[i];
+          Variable variable = column.first;
+          const auto &variableIndices = column.second;
 
-            uint64_t variableArrayOffset = instance->variableOffsets[variable];
+          uint64_t variableArrayOffset = instance->variableOffsets[variable];
 
-            uint64_t variableScalarOffset = getVariableFlatIndex(
-                instance->variablesDimensions[variable], column.second);
+          uint64_t variableScalarOffset = getVariableFlatIndex(
+              instance->variablesDimensions[variable], column.second);
 
-            assert(instance->jacobianFunctions[equation][variable] != nullptr);
+          auto jacobianFunction =
+              instance->jacobianFunctions[eq][variable].first;
 
-            auto jacobianFunctionResult =
-                instance->jacobianFunctions[equation][variable](
-                    equationIndices.data(), variableIndices.data());
+          auto seedsMapIt = jacobianSeedsMap.find(jacobianFunction);
+          assert(seedsMapIt != jacobianSeedsMap.end());
+          assert(jacobianFunction != nullptr);
 
-            instance->jacobianMatrixData[scalarEquationIndex][i].second =
-                jacobianFunctionResult;
+          auto jacobianFunctionResult = jacobianFunction(
+              equationIndices.data(), variableIndices.data(),
+              instance->memoryPoolId, seedsMapIt->second.data());
 
-            auto index = static_cast<sunindextype>(variableArrayOffset +
-                                                   variableScalarOffset);
+          instance->jacobianMatrixData[scalarEquationIndex][i].second =
+              jacobianFunctionResult;
 
-            instance->jacobianMatrixData[scalarEquationIndex][i].first = index;
-          }
-        } while (advanceEquationIndices(equationIndices,
-                                        instance->equationRanges[equation]));
-      }
-    });
-  }
+          auto index = static_cast<sunindextype>(variableArrayOffset +
+                                                 variableScalarOffset);
 
-  instance->threadPool.wait();
+          instance->jacobianMatrixData[scalarEquationIndex][i].first = index;
+        }
+      });
 
+  // Move the partial derivatives into the SUNDIALS sparse matrix.
   sunindextype *rowPtrs = SUNSparseMatrix_IndexPointers(jacobianMatrix);
   sunindextype *columnIndices = SUNSparseMatrix_IndexValues(jacobianMatrix);
 
@@ -791,6 +792,21 @@ AccessFunction KINSOLInstance::getWriteAccessFunction(Equation equation) const {
 
 uint64_t KINSOLInstance::getVariableRank(Variable variable) const {
   return variablesDimensions[variable].rank();
+}
+
+void KINSOLInstance::iterateAccessedArrayVariables(
+    Equation equation, std::function<void(Variable)> callback) const {
+  if (precomputedAccesses) {
+    for (const auto &access : variableAccesses[equation]) {
+      callback(access.first);
+    }
+  } else {
+    uint64_t numOfArrayVariables = getNumOfArrayVariables();
+
+    for (Variable variable = 0; variable < numOfArrayVariables; ++variable) {
+      callback(variable);
+    }
+  }
 }
 
 /// Determine which of the columns of the current Jacobian row has to be
@@ -898,7 +914,7 @@ void KINSOLInstance::computeNNZ() {
   }
 }
 
-void KINSOLInstance::computeResidualThreadChunks() {
+void KINSOLInstance::computeThreadChunks() {
   unsigned int numOfThreads = threadPool.getNumOfThreads();
 
   int64_t chunksFactor = getOptions().equationsChunksFactor;
@@ -938,8 +954,23 @@ void KINSOLInstance::computeResidualThreadChunks() {
                                         equationRanges[equation]);
       }
 
-      residualThreadEquationsChunks.emplace_back(
-          equation, std::move(beginIndices), std::move(endIndices));
+      JacobianSeedsMap jacobianSeedsMap;
+
+      iterateAccessedArrayVariables(equation, [&](Variable variable) {
+        auto jacobianFunction = jacobianFunctions[equation][variable].first;
+        const auto &seedSizes = jacobianFunctions[equation][variable].second;
+
+        for (const auto &seedSize : seedSizes) {
+          MemoryPool &memoryPool =
+              MemoryPoolManager::getInstance().get(memoryPoolId);
+          uint64_t seedId = memoryPool.create(seedSize);
+          jacobianSeedsMap[jacobianFunction].push_back(seedId);
+        }
+      });
+
+      threadEquationsChunks.emplace_back(equation, std::move(beginIndices),
+                                         std::move(endIndices),
+                                         std::move(jacobianSeedsMap));
 
       // Move to the next chunk.
       equationFlatIndex = endFlatIndex;
@@ -1035,9 +1066,10 @@ void KINSOLInstance::copyVariablesIntoMARCO(N_Vector variables) {
   KINSOL_PROFILER_COPY_VARS_INTO_MARCO_STOP;
 }
 
-void KINSOLInstance::residualsParallelIteration(
+void KINSOLInstance::equationsParallelIteration(
     std::function<void(Equation equation,
-                       const std::vector<int64_t> &equationIndices)>
+                       const std::vector<int64_t> &equationIndices,
+                       const JacobianSeedsMap &jacobianSeedsMap)>
         processFn) {
   // Shard the work among multiple threads.
   unsigned int numOfThreads = threadPool.getNumOfThreads();
@@ -1047,10 +1079,9 @@ void KINSOLInstance::residualsParallelIteration(
     threadPool.async([&]() {
       size_t assignedChunk;
 
-      while ((assignedChunk = chunkIndex++) <
-             residualThreadEquationsChunks.size()) {
-        const ResidualThreadEquationsChunk &chunk =
-            residualThreadEquationsChunks[assignedChunk];
+      while ((assignedChunk = chunkIndex++) < threadEquationsChunks.size()) {
+        const ThreadEquationsChunk &chunk =
+            threadEquationsChunks[assignedChunk];
 
         Equation equation = std::get<0>(chunk);
         std::vector<int64_t> equationIndices = std::get<1>(chunk);
@@ -1071,7 +1102,7 @@ void KINSOLInstance::residualsParallelIteration(
             return true;
           }() && "Invalid equation indices");
 
-          processFn(equation, equationIndices);
+          processFn(equation, equationIndices, std::get<3>(chunk));
         } while (advanceEquationIndicesUntil(
             equationIndices, equationRanges[equation], std::get<2>(chunk)));
       }
@@ -1473,13 +1504,15 @@ RUNTIME_FUNC_DEF(kinsolSetResidual, void, PTR(void), uint64_t, PTR(void))
 
 static void kinsolAddJacobian_void(void *instance, uint64_t equationIndex,
                                    uint64_t variableIndex,
-                                   void *jacobianFunction) {
+                                   void *jacobianFunction, uint64_t numOfSeeds,
+                                   uint64_t *seedSizes) {
   static_cast<KINSOLInstance *>(instance)->addJacobianFunction(
       equationIndex, variableIndex,
-      reinterpret_cast<JacobianFunction>(jacobianFunction));
+      reinterpret_cast<JacobianFunction>(jacobianFunction), numOfSeeds,
+      seedSizes);
 }
 
 RUNTIME_FUNC_DEF(kinsolAddJacobian, void, PTR(void), uint64_t, uint64_t,
-                 PTR(void))
+                 PTR(void), uint64_t, PTR(uint64_t))
 
 #endif // SUNDIALS_ENABLE

@@ -16,4 +16,5 @@ endif()
 target_link_libraries(SolverKINSOL
         PUBLIC
         SolverSUNDIALS
-        Profiling)
+        Profiling
+        Support)
