@@ -40,9 +40,11 @@ KINSOLInstance::~KINSOLInstance() {
     SUNMatDestroy(sparseMatrix);
   }
 
+#if SUNDIALS_VERSION_MAJOR >= 6
   if (ctx != nullptr) {
     SUNContext_Free(&ctx);
   }
+#endif
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Instance destroyed" << std::endl;

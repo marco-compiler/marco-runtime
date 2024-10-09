@@ -47,9 +47,11 @@ IDAInstance::~IDAInstance() {
     SUNMatDestroy(sparseMatrix);
   }
 
+#if SUNDIALS_VERSION_MAJOR >= 6
   if (ctx != nullptr) {
     SUNContext_Free(&ctx);
   }
+#endif
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[IDA] Instance destroyed" << std::endl;
