@@ -12,3 +12,8 @@ if (MARCO_ENABLE_SUNDIALS)
         SUNDIALS::nvecserial
         SUNDIALS::sunlinsolklu)
 endif()
+
+target_link_libraries(SolverKINSOL
+        PUBLIC
+        SolverSUNDIALS
+        Profiling)
