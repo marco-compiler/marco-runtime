@@ -30,6 +30,8 @@ namespace marco::runtime
     double time;
 
     do {
+        getSimulation()->iterationNum++;
+
       // Compute the next values of the state variables.
       if (marco::runtime::simulation::getOptions().debug) {
         std::cerr << "[Euler Forward] Updating state variables" << std::endl;
@@ -55,10 +57,13 @@ namespace marco::runtime
         std::cerr << "[Euler Forward] Printing values" << std::endl;
       }
 
-      // Print the values.
-      getSimulation()->getPrinter()->printValues();
+      // Print the values at a specified frequency.
+        getSimulation()->getPrinter()->printValues();
     } while (std::abs(simulation::getOptions().endTime - time) >=
              eulerforward::getOptions().timeStep);
+
+    getSimulation()->iterationNum++;
+    getSimulation()->getPrinter()->printValues();
 
     if (marco::runtime::simulation::getOptions().debug) {
       std::cerr << "[Euler Forward] Simulation finished" << std::endl;
