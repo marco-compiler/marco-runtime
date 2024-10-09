@@ -1,5 +1,10 @@
 #include "marco/Runtime/Support/MemoryManagement.h"
+#include <cassert>
 #include <cstdlib>
+#include <memory>
+#include <vector>
+
+using namespace ::marco::runtime;
 
 #ifdef MARCO_PROFILING
 
@@ -186,3 +191,51 @@ void marco_free(void* ptr)
   ::profiler().stopTimer();
 #endif
 }
+#include <iostream>
+namespace marco::runtime
+{
+
+MemoryPool::~MemoryPool() {
+  for (double* buffer : buffers) {
+    if (buffer != nullptr) {
+      std::free(buffer);
+    }
+  }
+}
+
+double* MemoryPool::get(uint64_t id) const {
+  assert(id < buffers.size());
+  return buffers[id];
+}
+
+uint64_t MemoryPool::create(size_t numOfElements) {
+  uint64_t id = buffers.size();
+  buffers.push_back(static_cast<double*>(std::malloc(sizeof(double) * numOfElements)));
+  return id;
+}
+
+MemoryPoolManager& MemoryPoolManager::getInstance() {
+  static MemoryPoolManager instance;
+  return instance;
+}
+
+MemoryPool& MemoryPoolManager::get(uint64_t pool) const {
+  assert(pool < pools.size());
+  return *pools[pool];
+}
+
+uint64_t MemoryPoolManager::create() {
+  uint64_t id = pools.size();
+  pools.push_back(std::make_unique<MemoryPool>());
+  return id;
+}
+}
+
+namespace {
+void* memoryPoolGet_pvoid(uint64_t pool, uint64_t buffer) {
+  MemoryPoolManager& manager = MemoryPoolManager::getInstance();
+  return static_cast<void*>(manager.get(pool).get(buffer));
+}
+}
+
+RUNTIME_FUNC_DEF(memoryPoolGet, PTR(void), int64_t, int64_t)
