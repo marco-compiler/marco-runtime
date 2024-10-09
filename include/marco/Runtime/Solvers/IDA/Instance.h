@@ -28,9 +28,31 @@ using ResidualFunction = double (*)(double, const int64_t *);
 /// The 2nd argument is a pointer to the list of equation indices.
 /// The 3rd argument is a pointer to the list of variable indices.
 /// The 4th argument is the 'alpha' value.
+/// The 5th argument is the identifier of the memory pool owning the AD seeds.
+/// The 6th argument is a pointer to the list of AD seed identifiers
 /// The result is the Jacobian value.
 using JacobianFunction = double (*)(double, const int64_t *, const uint64_t *,
-                                    double);
+                                    double, uint64_t, const uint64_t*);
+
+/// A descriptor of a Jacobian function is a pair of value consisting in:
+///  - the function pointer
+///  - the number of elements of each AD seed
+using JacobianFunctionDescriptor = std::pair<JacobianFunction, std::vector<uint64_t>>;
+
+/// A map indicating the IDs of the buffers living inside the memory pool to
+/// be used as AD seeds for each Jacobian function.
+using JacobianSeedsMap = std::map<JacobianFunction, std::vector<uint64_t>>;
+
+/// A chunk of equations to be processed by a thread while computing the
+/// residual values or partial derivatives.
+/// A chunk is composed of:
+///   - the identifier (position) of the equation.
+///   - the begin indices (included)
+///   - the end indices (excluded)
+///   - the map indicating the buffer IDs to be used when computing the
+///     partial derivatives
+using ThreadEquationsChunk =
+    std::tuple<Equation, std::vector<int64_t>, std::vector<int64_t>, JacobianSeedsMap>;
 
 class IDAInstance {
 public:
@@ -71,7 +93,8 @@ public:
   /// Add the function pointer that computes a partial derivative of an
   /// equation.
   void addJacobianFunction(Equation equationIndex, Variable variableIndex,
-                           JacobianFunction jacobianFunction);
+                           JacobianFunction jacobianFunction,
+                           uint64_t numOfSeeds, uint64_t* seedSizes);
 
   /// Instantiate and initialize all the classes needed by IDA in order to
   /// solve the given system of equations. It also sets optional simulation
@@ -139,12 +162,14 @@ private:
 
   [[nodiscard]] uint64_t getVariableRank(Variable variable) const;
 
+  void iterateAccessedArrayVariables(Equation equation, std::function<void(Variable)> callback) const;
+
   std::vector<JacobianColumn>
   computeJacobianColumns(Equation eq, const int64_t *equationIndices) const;
 
   void computeNNZ();
 
-  void computeResidualThreadChunks();
+  void computeThreadChunks();
 
   void copyVariablesFromMARCO(N_Vector algebraicAndStateVariablesVector,
                               N_Vector derivativeVariablesVector);
@@ -152,9 +177,10 @@ private:
   void copyVariablesIntoMARCO(N_Vector algebraicAndStateVariablesVector,
                               N_Vector derivativeVariablesVector);
 
-  void residualsParallelIteration(
+  void equationsParallelIteration(
       std::function<void(Equation equation,
-                         const std::vector<int64_t> &equationIndices)>
+                         const std::vector<int64_t> &equationIndices,
+                         const JacobianSeedsMap& jacobianSeedsMap)>
           processFn);
 
   void getVariableBeginIndices(Variable variable,
@@ -256,7 +282,7 @@ private:
   // The i-th position contains the list of partial derivative functions of
   // the i-th equation. The j-th function represents the function to
   // compute the derivative with respect to the j-th variable.
-  std::vector<std::vector<JacobianFunction>> jacobianFunctions;
+  std::vector<std::vector<JacobianFunctionDescriptor>> jacobianFunctions;
 
   // Whether the IDA instance is informed about the accesses to the
   // variables.
@@ -318,20 +344,14 @@ private:
   // Thread pool.
   ThreadPool threadPool;
 
-  // A chunk of equations to be processed by a thread while computing the
-  // residual values.
-  // A chunk is composed of:
-  //   - the identifier (position) of the equation.
-  //   - the begin indices (included)
-  //   - the end indices (excluded)
-  using ResidualThreadEquationsChunk =
-      std::tuple<Equation, std::vector<int64_t>, std::vector<int64_t>>;
+  // Memory pool ID.
+  uint64_t memoryPoolId;
 
   // The list of chunks the threads will process. Each thread elaborates
   // one chunk at a time.
   // The information is computed only once during the initialization to
   // save time during the actual simulation.
-  std::vector<ResidualThreadEquationsChunk> residualThreadEquationsChunks;
+  std::vector<ThreadEquationsChunk> threadEquationsChunks;
 };
 } // namespace marco::runtime::sundials::ida
 
@@ -371,7 +391,7 @@ RUNTIME_FUNC_DECL(idaAddEquation, uint64_t, PTR(void), PTR(int64_t), uint64_t,
 RUNTIME_FUNC_DECL(idaSetResidual, void, PTR(void), uint64_t, PTR(void))
 
 RUNTIME_FUNC_DECL(idaAddJacobian, void, PTR(void), uint64_t, uint64_t,
-                  PTR(void))
+                  PTR(void), uint64_t, PTR(uint64_t))
 
 RUNTIME_FUNC_DECL(printStatistics, void, PTR(void))
 

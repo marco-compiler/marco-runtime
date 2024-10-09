@@ -17,4 +17,5 @@ endif()
 target_link_libraries(SolverIDA
     PUBLIC
     SolverSUNDIALS
-    Profiling)
+    Profiling
+    Support)
