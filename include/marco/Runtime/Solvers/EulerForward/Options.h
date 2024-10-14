@@ -8,6 +8,7 @@ namespace marco::runtime::eulerforward
   struct Options
   {
     double timeStep = 0.1;
+    std::size_t snapshotSteps = 1;
   };
 
   Options& getOptions();

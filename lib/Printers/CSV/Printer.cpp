@@ -11,8 +11,7 @@
 using namespace ::marco::runtime;
 using namespace ::marco::runtime::printing;
 
-static void printDerWrapOpening(int64_t order)
-{
+static void printDerWrapOpening(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
     PRINT_PROFILER_STRING_START;
     std::cout << "der(";
@@ -20,8 +19,7 @@ static void printDerWrapOpening(int64_t order)
   }
 }
 
-static void printDerWrapClosing(int64_t order)
-{
+static void printDerWrapClosing(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
     PRINT_PROFILER_STRING_START;
     std::cout << ')';
@@ -29,8 +27,7 @@ static void printDerWrapClosing(int64_t order)
   }
 }
 
-static void printName(char* name, int64_t rank, const int64_t* indices)
-{
+static void printName(char *name, int64_t rank, const int64_t *indices) {
   PRINT_PROFILER_STRING_START;
   std::cout << name;
   PRINT_PROFILER_STRING_STOP;
@@ -58,8 +55,12 @@ static void printName(char* name, int64_t rank, const int64_t* indices)
   }
 }
 
-static void printHeader(const Simulation& simulation)
-{
+static void printHeader(const Simulation &simulation) {
+
+  if (printOptions().disablePrinting) {
+    return;
+  }
+
   PRINT_PROFILER_STRING_START;
   std::cout << '"' << "time" << '"';
   PRINT_PROFILER_STRING_STOP;
@@ -85,7 +86,7 @@ static void printHeader(const Simulation& simulation)
     }
 
     assert(baseVar != -1);
-    char* name = simulation.variablesNames[baseVar];
+    char *name = simulation.variablesNames[baseVar];
 
     if (rank == 0) {
       // Print only the variable name.
@@ -104,7 +105,7 @@ static void printHeader(const Simulation& simulation)
       // Print the name of the array and the indices, for each possible
       // combination of printable indices.
 
-      for (const auto& range : simulation.variablesPrintableIndices[var]) {
+      for (const auto &range : simulation.variablesPrintableIndices[var]) {
         auto beginIt = MultidimensionalRangeIterator::begin(range);
         auto endIt = MultidimensionalRangeIterator::end(range);
 
@@ -130,9 +131,13 @@ static void printHeader(const Simulation& simulation)
   PRINT_PROFILER_STRING_STOP;
 }
 
-static void printValues(const Simulation& simulation)
-{
-  auto& options = printOptions();
+static void printValues(const Simulation &simulation) {
+  auto &options = printOptions();
+
+  if (options.disablePrinting) {
+    return;
+  }
+
   std::cout.precision(options.precision);
 
   if (options.scientificNotation) {
@@ -173,7 +178,7 @@ static void printValues(const Simulation& simulation)
       PRINT_PROFILER_FLOAT_STOP;
     } else {
       // Print the components of the array variable.
-      for (const auto& range : simulation.variablesPrintableIndices[var]) {
+      for (const auto &range : simulation.variablesPrintableIndices[var]) {
         auto beginIt = MultidimensionalRangeIterator::begin(range);
         auto endIt = MultidimensionalRangeIterator::end(range);
 
@@ -197,44 +202,34 @@ static void printValues(const Simulation& simulation)
   PRINT_PROFILER_STRING_STOP;
 }
 
-namespace marco::runtime::printing
-{
-  CSVPrinter::CSVPrinter(Simulation* simulation)
-      : Printer(simulation)
-  {
-  }
+namespace marco::runtime::printing {
+CSVPrinter::CSVPrinter(Simulation *simulation) : Printer(simulation) {}
 
 #ifdef CLI_ENABLE
-  std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions()
-  {
-    return std::make_unique<CommandLineOptions>();
-  }
+std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions() {
+  return std::make_unique<CommandLineOptions>();
+}
 #endif // CLI_ENABLE
 
-  void CSVPrinter::simulationBegin()
-  {
-    SIMULATION_PROFILER_PRINTING_START;
-    ::printHeader(*getSimulation());
-    SIMULATION_PROFILER_PRINTING_STOP;
-  }
-
-  void CSVPrinter::printValues()
-  {
-    SIMULATION_PROFILER_PRINTING_START;
-    ::printValues(*getSimulation());
-    SIMULATION_PROFILER_PRINTING_STOP;
-  }
-
-  void CSVPrinter::simulationEnd()
-  {
-    // Do nothing.
-  }
+void CSVPrinter::simulationBegin() {
+  SIMULATION_PROFILER_PRINTING_START;
+  ::printHeader(*getSimulation());
+  SIMULATION_PROFILER_PRINTING_STOP;
 }
 
-namespace marco::runtime
-{
-  std::unique_ptr<Printer> getPrinter(Simulation* simulation)
-  {
-    return std::make_unique<printing::CSVPrinter>(simulation);
-  }
+void CSVPrinter::printValues() {
+  SIMULATION_PROFILER_PRINTING_START;
+  ::printValues(*getSimulation());
+  SIMULATION_PROFILER_PRINTING_STOP;
 }
+
+void CSVPrinter::simulationEnd() {
+  // Do nothing.
+}
+} // namespace marco::runtime::printing
+
+namespace marco::runtime {
+std::unique_ptr<Printer> getPrinter(Simulation *simulation) {
+  return std::make_unique<printing::CSVPrinter>(simulation);
+}
+} // namespace marco::runtime
