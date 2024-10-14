@@ -26,6 +26,8 @@ int EulerForward::run() {
 
   do {
     iterationStep++;
+    bool snapshotCondition =
+        iterationStep % eulerforward::getOptions().snapshotSteps == 0;
 
     // Compute the next values of the state variables.
     if (marco::runtime::simulation::getOptions().debug) {
@@ -42,19 +44,21 @@ int EulerForward::run() {
                 << std::endl;
     }
 
-    EULER_FORWARD_PROFILER_NONSTATEVAR_START;
-    time = getTime() + eulerforward::getOptions().timeStep;
-    setTime(time);
+    if (snapshotCondition) {
+      EULER_FORWARD_PROFILER_NONSTATEVAR_START;
+      time = getTime() + eulerforward::getOptions().timeStep;
+      setTime(time);
 
-    updateNonStateVariables();
-    EULER_FORWARD_PROFILER_NONSTATEVAR_STOP;
+      updateNonStateVariables();
+      EULER_FORWARD_PROFILER_NONSTATEVAR_STOP;
+    }
 
     if (marco::runtime::simulation::getOptions().debug) {
       std::cerr << "[Euler Forward] Printing values" << std::endl;
     }
 
     // Print the values at a specified frequency.
-    if (iterationStep % eulerforward::getOptions().snapshotSteps == 0) {
+    if (snapshotCondition) {
       getSimulation()->getPrinter()->printValues();
     }
 
