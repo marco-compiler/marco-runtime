@@ -84,6 +84,34 @@ RUNTIME_FUNC_DEF(asin, float, float)
 RUNTIME_FUNC_DEF(asin, double, double)
 
 //===----------------------------------------------------------------------===//
+// assert
+//===----------------------------------------------------------------------===//
+
+namespace
+{
+  void assert_void(bool condition, void* msg, int64_t level)
+  {
+    std::string in_msg((char*)msg); 
+    std::string mssg;
+    if(level){
+      mssg = "Error: ";
+    }
+    else{
+      mssg = "Warning: ";
+    }
+    mssg += in_msg;
+
+    if(!condition){
+      std::cerr << mssg;
+      std::abort();
+    }
+  }
+
+}
+
+RUNTIME_FUNC_DEF(assert, void, bool, PTR(void), int64_t)
+
+//===----------------------------------------------------------------------===//
 // atan
 //===----------------------------------------------------------------------===//
 
