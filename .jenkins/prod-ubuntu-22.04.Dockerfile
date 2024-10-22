@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-LABEL org.opencontainers.image.source="https://github.com/marco-compiler/marco"
+LABEL org.opencontainers.image.source="https://github.com/marco-compiler/marco-runtime"
 
 ARG LLVM_PARALLEL_COMPILE_JOBS=4
 ARG LLVM_PARALLEL_LINK_JOBS=1
