@@ -102,7 +102,7 @@ namespace
     mssg += in_msg;
 
     if(!condition){
-      std::cerr << mssg;
+      std::cerr << mssg + "\n";
       std::abort();
     }
   }
