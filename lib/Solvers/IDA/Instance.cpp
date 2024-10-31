@@ -27,8 +27,9 @@ IDAInstance::IDAInstance()
     : startTime(simulation::getOptions().startTime),
       endTime(simulation::getOptions().endTime),
       timeStep(getOptions().timeStep) {
-  // Initially there is no variable in the instance.
+  // Initially there is are no variables or equations in the instance.
   variableOffsets.push_back(0);
+  equationOffsets.push_back(0);
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[IDA] Instance created" << std::endl;
@@ -220,8 +221,6 @@ Variable IDAInstance::addStateVariable(uint64_t rank,
 }
 
 Equation IDAInstance::addEquation(const int64_t *ranges, uint64_t equationRank,
-                                  Variable writtenVariable,
-                                  AccessFunction writeAccess,
                                   const char *stringRepresentation) {
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[IDA] Adding equation";
@@ -235,17 +234,18 @@ Equation IDAInstance::addEquation(const int64_t *ranges, uint64_t equationRank,
 
   // Add the start and end dimensions of the current equation.
   MultidimensionalRange eqRanges = {};
+  uint64_t flatSize = 1;
 
   for (size_t i = 0, e = equationRank * 2; i < e; i += 2) {
     int64_t begin = ranges[i];
     int64_t end = ranges[i + 1];
     eqRanges.push_back({begin, end});
+    flatSize *= end - begin;
   }
 
   equationRanges.push_back(eqRanges);
-
-  // Add the write access.
-  writeAccesses.emplace_back(writtenVariable, writeAccess);
+  size_t offset = equationOffsets.back();
+  equationOffsets.push_back(offset + flatSize);
 
   // Return the index of the equation.
   Equation id = getNumOfVectorizedEquations() - 1;
@@ -265,9 +265,6 @@ Equation IDAInstance::addEquation(const int64_t *ranges, uint64_t equationRank,
     }
 
     std::cerr << "]" << std::endl;
-    std::cerr << "  - Written variable ID: " << writtenVariable << std::endl;
-    std::cerr << "  - Write access function address: "
-              << reinterpret_cast<void *>(writeAccess) << std::endl;
   }
 
   return id;
@@ -469,29 +466,6 @@ bool IDAInstance::initialize() {
     }
   }
 
-  // Determine the order in which the equations must be processed when
-  // computing residuals and jacobians.
-  assert(getNumOfVectorizedEquations() == writeAccesses.size());
-  equationsProcessingOrder.resize(getNumOfVectorizedEquations());
-
-  for (size_t i = 0, e = getNumOfVectorizedEquations(); i < e; ++i) {
-    equationsProcessingOrder[i] = i;
-  }
-
-  if (marco::runtime::simulation::getOptions().debug) {
-    std::cerr << "[IDA] Equations processing order: [";
-
-    for (size_t i = 0, e = equationsProcessingOrder.size(); i < e; ++i) {
-      if (i != 0) {
-        std::cerr << ", ";
-      }
-
-      std::cerr << equationsProcessingOrder[i];
-    }
-
-    std::cerr << "]" << std::endl;
-  }
-
   // Check that all the residual functions have been set.
   assert(residualFunctions.size() == getNumOfVectorizedEquations());
 
@@ -552,35 +526,19 @@ bool IDAInstance::initialize() {
 
   jacobianMatrixData.resize(scalarEquationsNumber);
 
-  for (Equation eq : equationsProcessingOrder) {
+  uint64_t numOfVectorizedEquations = getNumOfVectorizedEquations();
+
+  for (Equation eq = 0; eq < numOfVectorizedEquations; ++eq) {
     std::vector<int64_t> equationIndices;
     getEquationBeginIndices(eq, equationIndices);
 
-    Variable writtenVariable = getWrittenVariable(eq);
-
-    uint64_t writtenVariableRank = getVariableRank(writtenVariable);
-    uint64_t writtenVariableArrayOffset = variableOffsets[writtenVariable];
-
     do {
-      std::vector<uint64_t> writtenVariableIndices;
-      writtenVariableIndices.resize(writtenVariableRank, 0);
+      uint64_t equationArrayOffset = equationOffsets[eq];
 
-      AccessFunction writeAccessFunction = getWriteAccessFunction(eq);
+      uint64_t equationScalarOffset =
+          getEquationFlatIndex(equationIndices, equationRanges[eq]);
 
-      writeAccessFunction(equationIndices.data(),
-                          writtenVariableIndices.data());
-
-      if (marco::runtime::simulation::getOptions().debug) {
-        std::cerr << "    Variable indices: ";
-        printIndices(writtenVariableIndices);
-        std::cerr << std::endl;
-      }
-
-      uint64_t equationScalarVariableOffset = getVariableFlatIndex(
-          variablesDimensions[writtenVariable], writtenVariableIndices);
-
-      uint64_t scalarEquationIndex =
-          writtenVariableArrayOffset + equationScalarVariableOffset;
+      uint64_t scalarEquationIndex = equationArrayOffset + equationScalarOffset;
 
       // Compute the column indexes that may be non-zeros.
       std::vector<JacobianColumn> jacobianColumns =
@@ -592,10 +550,6 @@ bool IDAInstance::initialize() {
         std::cerr << "  - Equation " << eq << std::endl;
         std::cerr << "    Equation indices: ";
         printIndices(equationIndices);
-        std::cerr << std::endl;
-
-        std::cerr << "    Variable indices: ";
-        printIndices(writtenVariableIndices);
         std::cerr << std::endl;
 
         std::cerr << "    Scalar equation index: " << scalarEquationIndex
@@ -911,28 +865,12 @@ int IDAInstance::residualFunction(realtype time, N_Vector variables,
         uint64_t equationRank = instance->getEquationRank(eq);
         assert(equationIndices.size() == equationRank);
 
-        Variable writtenVariable = instance->getWrittenVariable(eq);
+        uint64_t equationArrayOffset = instance->equationOffsets[eq];
 
-        uint64_t writtenVariableArrayOffset =
-            instance->variableOffsets[writtenVariable];
+        uint64_t equationScalarOffset =
+            getEquationFlatIndex(equationIndices, instance->equationRanges[eq]);
 
-        uint64_t writtenVariableRank =
-            instance->getVariableRank(writtenVariable);
-
-        std::vector<uint64_t> writtenVariableIndices(writtenVariableRank, 0);
-
-        AccessFunction writeAccessFunction =
-            instance->getWriteAccessFunction(eq);
-
-        writeAccessFunction(equationIndices.data(),
-                            writtenVariableIndices.data());
-
-        uint64_t writtenVariableScalarOffset =
-            getVariableFlatIndex(instance->variablesDimensions[writtenVariable],
-                                 writtenVariableIndices);
-
-        uint64_t offset =
-            writtenVariableArrayOffset + writtenVariableScalarOffset;
+        uint64_t offset = equationArrayOffset + equationScalarOffset;
 
         auto residualFn = instance->residualFunctions[eq];
         auto *eqIndicesPtr = equationIndices.data();
@@ -978,29 +916,13 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
           const JacobianSeedsMap &jacobianSeedsMap) {
-        Variable writtenVariable = instance->getWrittenVariable(eq);
+        uint64_t equationArrayOffset = instance->equationOffsets[eq];
 
-        uint64_t writtenVariableArrayOffset =
-            instance->variableOffsets[writtenVariable];
-
-        uint64_t writtenVariableRank =
-            instance->getVariableRank(writtenVariable);
-
-        std::vector<uint64_t> writtenVariableIndices;
-        writtenVariableIndices.resize(writtenVariableRank, 0);
-
-        AccessFunction writeAccessFunction =
-            instance->getWriteAccessFunction(eq);
-
-        writeAccessFunction(equationIndices.data(),
-                            writtenVariableIndices.data());
-
-        uint64_t writtenVariableScalarOffset =
-            getVariableFlatIndex(instance->variablesDimensions[writtenVariable],
-                                 writtenVariableIndices);
+        uint64_t equationScalarOffset =
+            getEquationFlatIndex(equationIndices, instance->equationRanges[eq]);
 
         uint64_t scalarEquationIndex =
-            writtenVariableArrayOffset + writtenVariableScalarOffset;
+            equationArrayOffset + equationScalarOffset;
 
         assert(scalarEquationIndex < instance->getNumOfScalarEquations());
 
@@ -1128,14 +1050,6 @@ uint64_t IDAInstance::getEquationFlatSize(Equation equation) const {
   }
 
   return result;
-}
-
-Variable IDAInstance::getWrittenVariable(Equation equation) const {
-  return writeAccesses[equation].first;
-}
-
-AccessFunction IDAInstance::getWriteAccessFunction(Equation equation) const {
-  return writeAccesses[equation].second;
 }
 
 uint64_t IDAInstance::getVariableRank(Variable variable) const {
@@ -1279,7 +1193,7 @@ void IDAInstance::computeThreadChunks() {
   uint64_t processedEquations = 0;
 
   while (processedEquations < numOfVectorizedEquations) {
-    Equation equation = equationsProcessingOrder[processedEquations];
+    Equation equation = processedEquations;
     uint64_t equationFlatSize = getEquationFlatSize(equation);
     uint64_t equationFlatIndex = 0;
 
@@ -1952,42 +1866,6 @@ bool IDAInstance::idaSetLineSearchOffIC() {
   return retVal == IDA_SUCCESS;
 }
 
-void IDAInstance::getWritingEquation(
-    Variable variable, const std::vector<uint64_t> &variableIndices,
-    Equation &equation, std::vector<int64_t> &equationIndices) const {
-  bool found = false;
-  uint64_t numOfVectorizedEquations = getNumOfVectorizedEquations();
-
-  for (Equation eq = 0; eq < numOfVectorizedEquations; ++eq) {
-    Variable writtenVariable = getWrittenVariable(eq);
-
-    if (writtenVariable == variable) {
-      std::vector<int64_t> writingEquationIndices;
-      getEquationBeginIndices(eq, writingEquationIndices);
-
-      std::vector<uint64_t> writtenVariableIndices(
-          getVariableRank(writtenVariable));
-
-      AccessFunction writeAccessFunction = getWriteAccessFunction(eq);
-
-      do {
-        writeAccessFunction(writingEquationIndices.data(),
-                            writtenVariableIndices.data());
-
-        if (writtenVariableIndices == variableIndices) {
-          assert(!found && "Multiple equations writing to the same variable");
-          found = true;
-          equation = eq;
-          equationIndices = writingEquationIndices;
-        }
-      } while (
-          advanceEquationIndices(writingEquationIndices, equationRanges[eq]));
-    }
-  }
-
-  assert(found && "Writing equation not found");
-}
-
 void IDAInstance::printVariablesVector(N_Vector variables) const {
   realtype *data = N_VGetArrayPointer(variables);
   uint64_t numOfArrayVariables = getNumOfArrayVariables();
@@ -2030,25 +1908,18 @@ void IDAInstance::printDerivativesVector(N_Vector derivatives) const {
 
 void IDAInstance::printResidualsVector(N_Vector residuals) const {
   realtype *data = N_VGetArrayPointer(residuals);
-  uint64_t numOfArrayVariables = getNumOfArrayVariables();
+  uint64_t numOfVectorizedEquations = getNumOfVectorizedEquations();
 
-  for (Variable var = 0; var < numOfArrayVariables; ++var) {
-    std::vector<uint64_t> variableIndices;
-    getVariableBeginIndices(var, variableIndices);
+  for (Equation eq = 0; eq < numOfVectorizedEquations; ++eq) {
+    std::vector<int64_t> equationIndices;
+    getEquationBeginIndices(eq, equationIndices);
 
     do {
-      Equation eq;
-      std::vector<int64_t> equationIndices;
-      getWritingEquation(var, variableIndices, eq, equationIndices);
-
       std::cerr << "eq " << eq << " ";
       printIndices(equationIndices);
-      std::cerr << " (writing to var " << var;
-      printIndices(variableIndices);
-      std::cerr << ")" << "\t" << std::fixed << std::setprecision(9) << *data
-                << "\n";
+      std::cerr << "\t" << std::fixed << std::setprecision(9) << *data << "\n";
       ++data;
-    } while (advanceVariableIndices(variableIndices, variablesDimensions[var]));
+    } while (advanceEquationIndices(equationIndices, equationRanges[eq]));
   }
 }
 
@@ -2088,29 +1959,23 @@ void IDAInstance::printJacobianMatrix(SUNMatrix jacobianMatrix) const {
 
   std::cerr << std::endl;
 
-  // Print the rows containing the values.
+  // Print the matrix.
+  uint64_t numOfVectorizedEquations = getNumOfVectorizedEquations();
   uint64_t rowFlatIndex = 0;
 
-  for (Variable eqVar = 0; eqVar < numOfArrayVariables; ++eqVar) {
-    std::vector<uint64_t> eqVarIndices;
-    getVariableBeginIndices(eqVar, eqVarIndices);
+  for (Equation eq = 0; eq < numOfVectorizedEquations; ++eq) {
+    std::vector<int64_t> equationIndices;
+    getEquationBeginIndices(eq, equationIndices);
 
     do {
-      Equation eq;
-      std::vector<int64_t> equationIndices;
-      getWritingEquation(eqVar, eqVarIndices, eq, equationIndices);
-
       std::cerr << "eq " << eq << " ";
       printIndices(equationIndices);
-      std::cerr << " (writing to var " << eqVar << " ";
-      printIndices(eqVarIndices);
-      std::cerr << ")";
 
       uint64_t columnFlatIndex = 0;
 
-      for (Variable indVar = 0; indVar < numOfArrayVariables; ++indVar) {
-        std::vector<uint64_t> indVarIndices;
-        getVariableBeginIndices(indVar, indVarIndices);
+      for (Variable var = 0; var < numOfArrayVariables; ++var) {
+        std::vector<uint64_t> varIndices;
+        getVariableBeginIndices(var, varIndices);
 
         do {
           auto value = getCellFromSparseMatrix(jacobianMatrix, rowFlatIndex,
@@ -2118,13 +1983,12 @@ void IDAInstance::printJacobianMatrix(SUNMatrix jacobianMatrix) const {
 
           std::cerr << "\t" << std::fixed << std::setprecision(9) << value;
           columnFlatIndex++;
-        } while (
-            advanceVariableIndices(indVarIndices, variablesDimensions[indVar]));
+        } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
       }
 
       std::cerr << std::endl;
       rowFlatIndex++;
-    } while (advanceVariableIndices(eqVarIndices, variablesDimensions[eqVar]));
+    } while (advanceEquationIndices(equationIndices, equationRanges[eq]));
   }
 }
 } // namespace marco::runtime::sundials::ida
@@ -2262,17 +2126,13 @@ RUNTIME_FUNC_DEF(idaAddVariableAccess, void, PTR(void), uint64_t, uint64_t,
 // idaAddEquation
 
 static uint64_t idaAddEquation_i64(void *instance, int64_t *ranges,
-                                   uint64_t rank, uint64_t writtenVariable,
-                                   void *writeAccessFunction,
-                                   void *stringRepresentation) {
+                                   uint64_t rank, void *stringRepresentation) {
   return static_cast<IDAInstance *>(instance)->addEquation(
-      ranges, rank, writtenVariable,
-      reinterpret_cast<AccessFunction>(writeAccessFunction),
-      static_cast<const char *>(stringRepresentation));
+      ranges, rank, static_cast<const char *>(stringRepresentation));
 }
 
 RUNTIME_FUNC_DEF(idaAddEquation, uint64_t, PTR(void), PTR(int64_t), uint64_t,
-                 uint64_t, PTR(void), PTR(void))
+                 PTR(void))
 
 //===---------------------------------------------------------------------===//
 // idaSetResidual

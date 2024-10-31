@@ -63,8 +63,6 @@ public:
 
   /// Add the information about an equation that is handled by KINSOL.
   Equation addEquation(const int64_t *ranges, uint64_t rank,
-                       Variable writtenVariable,
-                       AccessFunction writeAccessFunction,
                        const char *stringRepresentation);
 
   void addVariableAccess(Equation equation, Variable variableIndex,
@@ -117,10 +115,6 @@ private:
 
   [[nodiscard]] uint64_t getEquationFlatSize(Equation equation) const;
 
-  [[nodiscard]] Variable getWrittenVariable(Equation equation) const;
-
-  [[nodiscard]] AccessFunction getWriteAccessFunction(Equation equation) const;
-
   [[nodiscard]] uint64_t getVariableRank(Variable variable) const;
 
   void
@@ -168,17 +162,6 @@ private:
   bool kinsolSetJacobianFunction();
 
   /// }
-  /// @name Utility functions
-  /// {
-
-  /// Get the scalar equation writing to a certain scalar variable.
-  /// Warning: extremely slow, to be used only for debug purposes.
-  void getWritingEquation(Variable variable,
-                          const std::vector<uint64_t> &variableIndices,
-                          Equation &equation,
-                          std::vector<int64_t> &equationIndices) const;
-
-  /// }
   /// @name Debug functions
   /// {
   void printVariablesVector(N_Vector variables) const;
@@ -206,17 +189,6 @@ private:
   // The iteration ranges of the vectorized equations.
   std::vector<MultidimensionalRange> equationRanges;
 
-  // The array variables written by the equations.
-  // The i-th position contains the information about the variable written
-  // by the i-th equation: the first element is the index of the IDA
-  // variable, while the second represents the ranges of the scalar
-  // variable.
-  std::vector<std::pair<Variable, AccessFunction>> writeAccesses;
-
-  // The order in which the equations must be processed when computing
-  // residuals and partial derivatives.
-  std::vector<Equation> equationsProcessingOrder;
-
   // The residual functions associated with the equations.
   // The i-th position contains the pointer to the residual function of the
   // i-th equation.
@@ -240,6 +212,10 @@ private:
 
   // The dimensions list of each array variable.
   std::vector<VariableDimensions> variablesDimensions;
+
+  // The offset of each array equation inside the flattened equations
+  // vector.
+  std::vector<uint64_t> equationOffsets;
 
   // Variables vectors and values.
   N_Vector variablesVector;
@@ -300,7 +276,7 @@ RUNTIME_FUNC_DECL(kinsolAddVariableAccess, void, PTR(void), uint64_t, uint64_t,
                   PTR(void))
 
 RUNTIME_FUNC_DECL(kinsolAddEquation, uint64_t, PTR(void), PTR(int64_t),
-                  uint64_t, uint64_t, PTR(void), PTR(void))
+                  uint64_t, PTR(void))
 
 RUNTIME_FUNC_DECL(kinsolSetResidual, void, PTR(void), uint64_t, PTR(void))
 
