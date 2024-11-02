@@ -11,8 +11,7 @@
 using namespace ::marco::runtime;
 using namespace ::marco::runtime::printing;
 
-static void printDerWrapOpening(int64_t order)
-{
+static void printDerWrapOpening(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
     PRINT_PROFILER_STRING_START;
     std::cout << "der(";
@@ -20,8 +19,7 @@ static void printDerWrapOpening(int64_t order)
   }
 }
 
-static void printDerWrapClosing(int64_t order)
-{
+static void printDerWrapClosing(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
     PRINT_PROFILER_STRING_START;
     std::cout << ')';
@@ -29,8 +27,7 @@ static void printDerWrapClosing(int64_t order)
   }
 }
 
-static void printName(char* name, int64_t rank, const int64_t* indices)
-{
+static void printName(char *name, int64_t rank, const int64_t *indices) {
   PRINT_PROFILER_STRING_START;
   std::cout << name;
   PRINT_PROFILER_STRING_STOP;
@@ -58,8 +55,7 @@ static void printName(char* name, int64_t rank, const int64_t* indices)
   }
 }
 
-static void printHeader(const Simulation& simulation)
-{
+static void printHeader(const Simulation &simulation) {
   PRINT_PROFILER_STRING_START;
   std::cout << '"' << "time" << '"';
   PRINT_PROFILER_STRING_STOP;
@@ -85,7 +81,7 @@ static void printHeader(const Simulation& simulation)
     }
 
     assert(baseVar != -1);
-    char* name = simulation.variablesNames[baseVar];
+    char *name = simulation.variablesNames[baseVar];
 
     if (rank == 0) {
       // Print only the variable name.
@@ -104,7 +100,7 @@ static void printHeader(const Simulation& simulation)
       // Print the name of the array and the indices, for each possible
       // combination of printable indices.
 
-      for (const auto& range : simulation.variablesPrintableIndices[var]) {
+      for (const auto &range : simulation.variablesPrintableIndices[var]) {
         auto beginIt = MultidimensionalRangeIterator::begin(range);
         auto endIt = MultidimensionalRangeIterator::end(range);
 
@@ -130,9 +126,91 @@ static void printHeader(const Simulation& simulation)
   PRINT_PROFILER_STRING_STOP;
 }
 
-static void printValues(const Simulation& simulation)
-{
-  auto& options = printOptions();
+namespace marco::runtime::printing {
+CSVPrinter::CSVPrinter(Simulation *simulation)
+    : Printer(simulation),
+      buffer(1 + simulation->getNumOfPrintableScalarVariables(),
+             printOptions().bufferSize,
+             [&](const double *values, uint64_t count) {
+               printBufferedValues(values, count);
+             }) {
+  initialize();
+}
+
+#ifdef CLI_ENABLE
+std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions() {
+  return std::make_unique<CommandLineOptions>();
+}
+#endif // CLI_ENABLE
+
+void CSVPrinter::simulationBegin() {
+  SIMULATION_PROFILER_PRINTING_START;
+  ::printHeader(*getSimulation());
+  SIMULATION_PROFILER_PRINTING_STOP;
+}
+
+void CSVPrinter::printValues() {
+  buffer.getActiveBuffer()[0] = getTime();
+
+  for (int64_t var : getSimulation()->variablesPrintOrder) {
+    if (!getSimulation()->printableVariables[var]) {
+      // The variable must not be printed.
+      continue;
+    }
+
+    int64_t rank = getSimulation()->variablesRanks[var];
+
+    if (rank != 0 && getSimulation()->variablesPrintableIndices[var].empty()) {
+      // The array variable has no printable indices.
+      continue;
+    }
+
+    if (rank == 0) {
+      // Print the scalar variable.
+      double value = getVariableValue(var, nullptr);
+      buffer.getActiveBuffer()[bufferPositions[var]] = value;
+    } else {
+      // Print the components of the array variable.
+      size_t relativePos = 0;
+
+      for (const auto &range :
+           getSimulation()->variablesPrintableIndices[var]) {
+        auto beginIt = MultidimensionalRangeIterator::begin(range);
+        auto endIt = MultidimensionalRangeIterator::end(range);
+
+        for (auto it = beginIt; it != endIt; ++it) {
+          double value = getVariableValue(var, *it);
+          buffer.getActiveBuffer()[bufferPositions[var] + relativePos] = value;
+          ++relativePos;
+        }
+      }
+    }
+  }
+
+  buffer.endLine();
+}
+
+void CSVPrinter::simulationEnd() { buffer.flush(); }
+
+void CSVPrinter::initialize() {
+  bufferPositions.resize(getSimulation()->printableVariables.size(), 0);
+
+  // Time variable.
+  bufferPositions.push_back(0);
+
+  // Model variables.
+  int64_t position = 1;
+
+  for (int64_t variable : getSimulation()->variablesPrintOrder) {
+    bufferPositions[variable] = position;
+    position += getSimulation()->getNumOfPrintableScalarVariables(variable);
+  }
+}
+
+void CSVPrinter::printBufferedValues(const double *values, uint64_t count) {
+  SIMULATION_PROFILER_PRINTING_START;
+
+  auto &options = printOptions();
   std::cout.precision(options.precision);
 
   if (options.scientificNotation) {
@@ -141,100 +219,28 @@ static void printValues(const Simulation& simulation)
     std::cout << std::fixed;
   }
 
-  double time = getTime();
+  for (uint64_t i = 0; i < count; ++i) {
+    PRINT_PROFILER_FLOAT_START;
+    std::cout << values[i];
+    PRINT_PROFILER_FLOAT_STOP;
 
-  PRINT_PROFILER_FLOAT_START;
-  std::cout << time;
-  PRINT_PROFILER_FLOAT_STOP;
-
-  for (int64_t var : simulation.variablesPrintOrder) {
-    if (!simulation.printableVariables[var]) {
-      // The variable must not be printed.
-      continue;
-    }
-
-    int64_t rank = simulation.variablesRanks[var];
-
-    if (rank != 0 && simulation.variablesPrintableIndices[var].empty()) {
-      // The array variable has no printable indices.
-      continue;
-    }
-
-    if (rank == 0) {
-      // Print the scalar variable.
-      double value = getVariableValue(var, nullptr);
-
+    if (i + 1 != count) {
       PRINT_PROFILER_STRING_START;
       std::cout << ',';
       PRINT_PROFILER_STRING_STOP;
-
-      PRINT_PROFILER_FLOAT_START;
-      std::cout << value;
-      PRINT_PROFILER_FLOAT_STOP;
-    } else {
-      // Print the components of the array variable.
-      for (const auto& range : simulation.variablesPrintableIndices[var]) {
-        auto beginIt = MultidimensionalRangeIterator::begin(range);
-        auto endIt = MultidimensionalRangeIterator::end(range);
-
-        for (auto it = beginIt; it != endIt; ++it) {
-          double value = getVariableValue(var, *it);
-
-          PRINT_PROFILER_STRING_START;
-          std::cout << ',';
-          PRINT_PROFILER_STRING_STOP;
-
-          PRINT_PROFILER_FLOAT_START;
-          std::cout << value;
-          PRINT_PROFILER_FLOAT_STOP;
-        }
-      }
     }
   }
 
   PRINT_PROFILER_STRING_START;
   std::cout << std::endl;
   PRINT_PROFILER_STRING_STOP;
+
+  SIMULATION_PROFILER_PRINTING_STOP;
 }
+} // namespace marco::runtime::printing
 
-namespace marco::runtime::printing
-{
-  CSVPrinter::CSVPrinter(Simulation* simulation)
-      : Printer(simulation)
-  {
-  }
-
-#ifdef CLI_ENABLE
-  std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions()
-  {
-    return std::make_unique<CommandLineOptions>();
-  }
-#endif // CLI_ENABLE
-
-  void CSVPrinter::simulationBegin()
-  {
-    SIMULATION_PROFILER_PRINTING_START;
-    ::printHeader(*getSimulation());
-    SIMULATION_PROFILER_PRINTING_STOP;
-  }
-
-  void CSVPrinter::printValues()
-  {
-    SIMULATION_PROFILER_PRINTING_START;
-    ::printValues(*getSimulation());
-    SIMULATION_PROFILER_PRINTING_STOP;
-  }
-
-  void CSVPrinter::simulationEnd()
-  {
-    // Do nothing.
-  }
+namespace marco::runtime {
+std::unique_ptr<Printer> getPrinter(Simulation *simulation) {
+  return std::make_unique<printing::CSVPrinter>(simulation);
 }
-
-namespace marco::runtime
-{
-  std::unique_ptr<Printer> getPrinter(Simulation* simulation)
-  {
-    return std::make_unique<printing::CSVPrinter>(simulation);
-  }
-}
+} // namespace marco::runtime

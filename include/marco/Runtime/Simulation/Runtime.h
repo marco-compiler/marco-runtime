@@ -10,6 +10,12 @@
 namespace marco::runtime {
 class Simulation {
 public:
+  /// Get the overall number of printable scalar variables.
+  int64_t getNumOfPrintableScalarVariables() const;
+
+  /// Get the number of printable scalar elements of an array variable.
+  int64_t getNumOfPrintableScalarVariables(int64_t variable) const;
+
   /// Get the data printer.
   Printer *getPrinter();
 

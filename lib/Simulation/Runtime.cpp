@@ -40,6 +40,43 @@ static void printHelp() {
 //===---------------------------------------------------------------------===//
 
 namespace marco::runtime {
+int64_t Simulation::getNumOfPrintableScalarVariables() const {
+  int64_t result = 0;
+
+  for (int64_t variable : variablesPrintOrder) {
+    result += getNumOfPrintableScalarVariables(variable);
+  }
+
+  return result;
+}
+
+int64_t Simulation::getNumOfPrintableScalarVariables(int64_t variable) const {
+  if (!printableVariables[variable]) {
+    // The variable must not be printed.
+    return 0;
+  }
+
+  int64_t rank = variablesRanks[variable];
+
+  if (rank == 0) {
+    return 1;
+  }
+
+  int64_t result = 0;
+
+  for (const auto &range : variablesPrintableIndices[variable]) {
+    size_t rangeSize = 1;
+
+    for (int64_t dim = 0; dim < rank; ++dim) {
+      rangeSize *= range[dim].end - range[dim].begin;
+    }
+
+    result += rangeSize;
+  }
+
+  return result;
+}
+
 Printer *Simulation::getPrinter() {
   assert(printer != nullptr);
   return printer;

@@ -11,6 +11,7 @@ marco_add_runtime_static_library(OptionsCSVPrinter_static
 # Main library.
 marco_add_runtime_static_library(PrinterCSV
     ../Printer.cpp
+    ../DoubleBuffer.cpp
     CLI.cpp
     Printer.cpp
     Profiler.cpp)
