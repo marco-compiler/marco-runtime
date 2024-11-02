@@ -35,4 +35,7 @@ RUNTIME_FUNC_DECL(clone, void, ARRAY(double), ARRAY(int64_t))
 RUNTIME_FUNC_DECL(clone, void, ARRAY(double), ARRAY(float))
 RUNTIME_FUNC_DECL(clone, void, ARRAY(double), ARRAY(double))
 
-#endif	// MARCO_RUNTIME_UTILITYFUNCTIONS_H
+extern "C" void memrefCopy(int64_t elemSize, UnrankedMemRefType<char> *src,
+                           UnrankedMemRefType<char> *dst);
+
+#endif // MARCO_RUNTIME_UTILITYFUNCTIONS_H

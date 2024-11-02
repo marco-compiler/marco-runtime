@@ -30,9 +30,9 @@ include(AddMARCORuntime)
 # CLI
 #------------------------------------------------------------------------------
 
-option(MARCO_ENABLE_CLI "Enable the command-line interface" ON)
+option(MARCO_CLI "Enable the command-line interface" ON)
 
-if (MARCO_ENABLE_CLI)
+if (MARCO_CLI)
     add_compile_definitions(CLI_ENABLE)
 endif()
 

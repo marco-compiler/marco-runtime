@@ -10,6 +10,11 @@ macro(marco_add_runtime_library name)
         target_compile_definitions(${name} PRIVATE SUNDIALS_ENABLE)
     endif()
 
+    # Enable the profiling framework.
+    if (MARCO_PROFILING)
+        target_compile_definitions(${name} PUBLIC MARCO_PROFILING)
+    endif()
+
     install(TARGETS ${name}
             EXPORT MARCORuntimeTargets
             COMPONENT ${name}
@@ -21,11 +26,6 @@ endmacro()
 
 macro(marco_add_runtime_static_library name)
     marco_add_runtime_library(${name} STATIC ${ARGN})
-
-    # Enable the profiling framework.
-    if (MARCO_PROFILING)
-        target_compile_definitions(${name} PUBLIC MARCO_PROFILING)
-    endif()
 endmacro()
 
 macro(marco_add_runtime_shared_library name)

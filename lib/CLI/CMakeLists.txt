@@ -11,9 +11,8 @@ FetchContent_MakeAvailable(argh)
 install(TARGETS argh
         EXPORT MARCORuntimeTargets)
 
-# Declare the library used to make the simulation executable.
+# Declare the library.
 marco_add_runtime_static_library(CLI
-    STATIC
     Category.cpp
     CLI.cpp)
 
