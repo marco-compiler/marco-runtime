@@ -15,6 +15,7 @@ void CommandLineOptions::printCommandLineOptions(std::ostream &os) const {
   os << "  --end-time=<value>               Set the end time (in seconds). Defaults to " << getOptions().endTime << "." << std::endl;
   os << "  --equations-partitioning-factor  Set the amount of equation partitions each thread would process in an ideal scenario where all the equations are independent from each other and have equal computational cost. Defaults to " << getOptions().equationsPartitioningFactor << "." << std::endl;
   os << "  --scheduler-calibration-runs     Set the amount of sequential and multithreaded executions used to decide the execution policy. Defaults to " << getOptions().schedulerCalibrationRuns << "." << std::endl;
+  os << "  --scheduler-policy               Force the schedulers to adopt a certain execution policy (sequential / multithreaded)." << std::endl;
   // clang-format on
 }
 
@@ -27,6 +28,16 @@ void CommandLineOptions::parseCommandLineOptions(
   options("end-time") >> getOptions().endTime;
   options("equations-partitioning-factor") >> getOptions().equationsPartitioningFactor;
   options("scheduler-calibration-runs") >> getOptions().schedulerCalibrationRuns;
+
+  std::string schedulerPolicy;
+  options("scheduler-policy") >> schedulerPolicy;
+
+  if (schedulerPolicy == "sequential") {
+    getOptions().schedulerPolicy = SchedulerPolicy::Sequential;
+  } else if (schedulerPolicy == "multithreaded") {
+    getOptions().schedulerPolicy = SchedulerPolicy::Multithreaded;
+  }
+
   // clang-format on
 }
 

@@ -4,123 +4,110 @@
 #include "marco/Runtime/Modeling/MultidimensionalRange.h"
 #include "marco/Runtime/Profiling/Profiling.h"
 #include "marco/Runtime/Profiling/Timer.h"
+#include "marco/Runtime/Simulation/Options.h"
 #include "marco/Runtime/Support/Mangling.h"
 #include <cstdint>
 #include <vector>
 
-namespace marco::runtime
-{
+namespace marco::runtime {
 #ifdef MARCO_PROFILING
-  class SchedulerProfiler : public profiling::Profiler
-  {
-    public:
-      SchedulerProfiler(int64_t schedulerId);
+class SchedulerProfiler : public profiling::Profiler {
+public:
+  SchedulerProfiler(int64_t schedulerId);
 
-      void createPartitionsGroupsCounters(size_t amount);
+  void createPartitionsGroupsCounters(size_t amount);
 
-      void createPartitionsGroupsTimers(size_t amount);
+  void createPartitionsGroupsTimers(size_t amount);
 
-      void reset() override;
+  void reset() override;
 
-      void print() const override;
+  void print() const override;
 
-    public:
-      profiling::Timer addEquation;
-      profiling::Timer initialization;
-      profiling::Timer run;
-      int64_t sequentialRuns{0};
-      int64_t multithreadedRuns{0};
-      std::vector<int64_t> partitionsGroupsCounters;
-      std::vector<std::unique_ptr<profiling::Timer>> partitionsGroups;
+public:
+  profiling::Timer addEquation;
+  profiling::Timer initialization;
+  profiling::Timer run;
+  int64_t sequentialRuns{0};
+  int64_t multithreadedRuns{0};
+  std::vector<int64_t> partitionsGroupsCounters;
+  std::vector<std::unique_ptr<profiling::Timer>> partitionsGroups;
 
-      mutable std::mutex mutex;
-  };
+  mutable std::mutex mutex;
+};
 #endif
 
-  class Scheduler
-  {
-    public:
-      using EquationFunction = void(*)(const int64_t*);
+class Scheduler {
+public:
+  using EquationFunction = void (*)(const int64_t *);
 
-      struct Equation
-      {
-        EquationFunction function;
-        MultidimensionalRange indices;
-        bool independentIndices;
+  struct Equation {
+    EquationFunction function;
+    MultidimensionalRange indices;
+    bool independentIndices;
 
-        Equation(
-            EquationFunction function,
-            MultidimensionalRange indices,
-            bool independentIndices);
-      };
+    Equation(EquationFunction function, MultidimensionalRange indices,
+             bool independentIndices);
+  };
 
-      // An equation partition is composed of:
-      //   - the equation descriptor.
-      //   - the ranges information to be passed to the equation function.
-      using EquationPartition = std::pair<Equation, std::vector<int64_t>>;
+  // An equation partition is composed of:
+  //   - the equation descriptor.
+  //   - the ranges information to be passed to the equation function.
+  using EquationPartition = std::pair<Equation, std::vector<int64_t>>;
 
-      enum class RunStrategy
-      {
-        Sequential,
-        Multithreaded
-      };
+  // A group of equation partitions.
+  using EquationsGroup = std::vector<EquationPartition>;
 
-      Scheduler();
+  Scheduler();
 
-      void addEquation(
-          EquationFunction function,
-          uint64_t rank,
-          int64_t* ranges,
-          bool independentIndices);
+  void addEquation(EquationFunction function, uint64_t rank, int64_t *ranges,
+                   bool independentIndices);
 
-      void run();
+  void run();
 
-    private:
-      void initialize();
+private:
+  void initialize();
 
-      [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
-          const Equation& equation) const;
+  [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
+      const Equation &equation,
+      const std::vector<EquationsGroup> &schedule) const;
 
-      [[maybe_unused, nodiscard]] bool checkEquationIndicesExistence(
-          const EquationPartition& equationPartition) const;
+  [[maybe_unused, nodiscard]] bool checkEquationIndicesExistence(
+      const EquationPartition &equationPartition) const;
 
-      void runSequential();
+  void runSequential();
 
-      void runSequentialWithCalibration();
+  void runSequentialWithCalibration();
 
-      void runMultithreaded();
+  void runMultithreaded();
 
-      void runMultithreadedWithCalibration();
+  void runMultithreadedWithCalibration();
 
-    private:
-      int64_t identifier{0};
-      bool initialized{false};
-      std::vector<Equation> equations;
+private:
+  int64_t identifier{0};
+  bool initialized{false};
+  std::vector<Equation> equations;
 
-      // The list of equation partitions to be executed in case of sequential
-      // execution policy.
-      // The information is computed only once during the initialization.
-      std::vector<EquationPartition> sequentialSchedule;
+  // The list of equation partitions to be executed in case of sequential
+  // execution policy.
+  // The information is computed only once during the initialization.
+  std::vector<EquationPartition> sequentialSchedule;
 
-      // A group of equation partitions.
-      using EquationsGroup = std::vector<EquationPartition>;
+  // The list of equations groups the threads will process. Each thread
+  // processes one group at a time.
+  // The information is computed only once during the initialization.
+  std::vector<EquationsGroup> multithreadedSchedule;
 
-      // The list of equations groups the threads will process. Each thread
-      // processes one group at a time.
-      // The information is computed only once during the initialization.
-      std::vector<EquationsGroup> multithreadedSchedule;
-
-      int64_t runsCounter{0};
-      int64_t sequentialRunsMinTime{0};
-      int64_t multithreadedRunsMinTime{0};
-      RunStrategy runStrategy{RunStrategy::Sequential};
+  int64_t runsCounter{0};
+  int64_t sequentialRunsMinTime{0};
+  int64_t multithreadedRunsMinTime{0};
+  std::optional<SchedulerPolicy> policy{std::nullopt};
 
 #ifdef MARCO_PROFILING
-      // Profiling.
-      std::shared_ptr<SchedulerProfiler> profiler;
+  // Profiling.
+  std::shared_ptr<SchedulerProfiler> profiler;
 #endif
-  };
-}
+};
+} // namespace marco::runtime
 
 //===---------------------------------------------------------------------===//
 // Exported functions
@@ -130,7 +117,8 @@ RUNTIME_FUNC_DECL(schedulerCreate, PTR(void))
 
 RUNTIME_FUNC_DECL(schedulerDestroy, void, PTR(void))
 
-RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t, PTR(int64_t), bool)
+RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
+                  PTR(int64_t), bool)
 
 RUNTIME_FUNC_DECL(schedulerRun, void, PTR(void))
 
