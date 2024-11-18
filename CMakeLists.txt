@@ -122,7 +122,7 @@ endif()
 #------------------------------------------------------------------------------
 
 # Profiling.
-option(MARCO_PROFILING "Generate code for runtime profiling." OFF)
+option(MARCO_PROFILING "Generate code for runtime profiling." ON)
 
 # Include directories.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${MLIR_INCLUDE_DIRS})

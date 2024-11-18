@@ -655,9 +655,9 @@ bool IDAInstance::calcIC() {
   realtype firstOutTime =
       (endTime - startTime) / getOptions().timeScalingFactorInit;
 
-  IDA_PROFILER_IC_START;
+  IDA_PROFILER_IC_START
   auto calcICRetVal = IDACalcIC(idaMemory, IDA_YA_YDP_INIT, firstOutTime);
-  IDA_PROFILER_IC_STOP;
+  IDA_PROFILER_IC_STOP
 
   if (calcICRetVal != IDA_SUCCESS) {
     if (calcICRetVal == IDALS_MEM_NULL) {
@@ -757,8 +757,8 @@ bool IDAInstance::step() {
   }
 
   // Execute one step.
-  IDA_PROFILER_STEPS_COUNTER_INCREMENT;
-  IDA_PROFILER_STEP_START;
+  IDA_PROFILER_STEPS_COUNTER_INCREMENT
+  IDA_PROFILER_STEP_START
 
   realtype tout =
       getOptions().equidistantTimeGrid ? (currentTime + timeStep) : endTime;
@@ -767,7 +767,7 @@ bool IDAInstance::step() {
       idaMemory, tout, &currentTime, variablesVector, derivativesVector,
       getOptions().equidistantTimeGrid ? IDA_NORMAL : IDA_ONE_STEP);
 
-  IDA_PROFILER_STEP_STOP;
+  IDA_PROFILER_STEP_STOP
 
   if (solveRetVal != IDA_SUCCESS) {
     if (solveRetVal == IDA_TSTOP_RETURN) {
@@ -844,7 +844,7 @@ realtype IDAInstance::getCurrentTime() const { return currentTime; }
 int IDAInstance::residualFunction(realtype time, N_Vector variables,
                                   N_Vector derivatives, N_Vector residuals,
                                   void *userData) {
-  IDA_PROFILER_RESIDUALS_CALL_COUNTER_INCREMENT;
+  IDA_PROFILER_RESIDUALS_CALL_COUNTER_INCREMENT
 
   realtype *rval = N_VGetArrayPointer(residuals);
   auto *instance = static_cast<IDAInstance *>(userData);
@@ -856,7 +856,7 @@ int IDAInstance::residualFunction(realtype time, N_Vector variables,
 
   // For every vectorized equation, set the residual values of the variables
   // it writes into.
-  IDA_PROFILER_RESIDUALS_START;
+  IDA_PROFILER_RESIDUALS_START
 
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
@@ -877,7 +877,7 @@ int IDAInstance::residualFunction(realtype time, N_Vector variables,
         *(rval + offset) = residualFunctionResult;
       });
 
-  IDA_PROFILER_RESIDUALS_STOP;
+  IDA_PROFILER_RESIDUALS_STOP
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[IDA] Residuals function called" << std::endl;
@@ -897,7 +897,7 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
                                 N_Vector residuals, SUNMatrix jacobianMatrix,
                                 void *userData, N_Vector tempv1,
                                 N_Vector tempv2, N_Vector tempv3) {
-  IDA_PROFILER_PARTIAL_DERIVATIVES_CALL_COUNTER_INCREMENT;
+  IDA_PROFILER_PARTIAL_DERIVATIVES_CALL_COUNTER_INCREMENT
 
   realtype *jacobian = SUNSparseMatrix_Data(jacobianMatrix);
   auto *instance = static_cast<IDAInstance *>(userData);
@@ -909,7 +909,7 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
 
   // For every vectorized equation, compute its row within the Jacobian
   // matrix.
-  IDA_PROFILER_PARTIAL_DERIVATIVES_START;
+  IDA_PROFILER_PARTIAL_DERIVATIVES_START
 
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
@@ -984,7 +984,7 @@ int IDAInstance::jacobianMatrix(realtype time, realtype alpha,
   assert(jacobian ==
          SUNSparseMatrix_Data(jacobianMatrix) + instance->nonZeroValuesNumber);
 
-  IDA_PROFILER_PARTIAL_DERIVATIVES_STOP;
+  IDA_PROFILER_PARTIAL_DERIVATIVES_STOP
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[IDA] Jacobian matrix function called" << std::endl;
@@ -1249,7 +1249,7 @@ void IDAInstance::copyVariablesFromMARCO(
     std::cerr << "[IDA] Copying variables from MARCO" << std::endl;
   }
 
-  IDA_PROFILER_COPY_VARS_FROM_MARCO_START;
+  IDA_PROFILER_COPY_VARS_FROM_MARCO_START
 
   realtype *varsPtr = N_VGetArrayPointer(algebraicAndStateVariablesVector);
   realtype *dersPtr = N_VGetArrayPointer(derivativeVariablesVector);
@@ -1301,7 +1301,7 @@ void IDAInstance::copyVariablesFromMARCO(
     } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
   }
 
-  IDA_PROFILER_COPY_VARS_FROM_MARCO_STOP;
+  IDA_PROFILER_COPY_VARS_FROM_MARCO_STOP
 }
 
 void IDAInstance::copyVariablesIntoMARCO(
@@ -1311,7 +1311,7 @@ void IDAInstance::copyVariablesIntoMARCO(
     std::cerr << "[IDA] Copying variables into MARCO" << std::endl;
   }
 
-  IDA_PROFILER_COPY_VARS_INTO_MARCO_START;
+  IDA_PROFILER_COPY_VARS_INTO_MARCO_START
 
   realtype *varsPtr = N_VGetArrayPointer(algebraicAndStateVariablesVector);
   realtype *dersPtr = N_VGetArrayPointer(derivativeVariablesVector);
@@ -1374,7 +1374,7 @@ void IDAInstance::copyVariablesIntoMARCO(
     } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
   }
 
-  IDA_PROFILER_COPY_VARS_INTO_MARCO_STOP;
+  IDA_PROFILER_COPY_VARS_INTO_MARCO_STOP
 }
 
 void IDAInstance::equationsParallelIteration(

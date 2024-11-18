@@ -11,6 +11,7 @@ enum class SchedulerPolicy { Sequential, Multithreaded };
 namespace marco::runtime::simulation {
 struct Options {
   bool debug = false;
+  bool profiling = false;
 
   double startTime = 0;
   double endTime = 10;

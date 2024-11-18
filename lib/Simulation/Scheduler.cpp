@@ -88,30 +88,62 @@ void SchedulerProfiler::print() const {
   }
 }
 
-#define SCHEDULER_PROFILER_ADD_EQUATION_START profiler->addEquation.start()
-#define SCHEDULER_PROFILER_ADD_EQUATION_STOP profiler->addEquation.stop()
+// clang-format off
+#define SCHEDULER_PROFILER_ADD_EQUATION_START                                 \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->addEquation.start();                                            \
+  }
 
-#define SCHEDULER_PROFILER_RUN_START profiler->run.start()
-#define SCHEDULER_PROFILER_RUN_STOP profiler->run.stop()
+#define SCHEDULER_PROFILER_ADD_EQUATION_STOP                                  \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->addEquation.stop();                                             \
+  }
 
-#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER                   \
-  ++profiler->sequentialRuns
-#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_RUNS_COUNTER                \
-  ++profiler->multithreadedRuns
+#define SCHEDULER_PROFILER_RUN_START                                          \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->run.start();                                                    \
+  }
 
-#define SCHEDULER_PROFILER_INITIALIZATION_START profiler->initialization.start()
-#define SCHEDULER_PROFILER_INITIALIZATION_STOP profiler->initialization.stop()
+#define SCHEDULER_PROFILER_RUN_STOP                                           \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->run.stop();                                                     \
+  }
 
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread)                      \
-  profiler->partitionsGroups[thread]->start();                                 \
-  profiler->partitionsGroupsCounters[thread]++
+#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER                  \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    ++profiler->sequentialRuns;                                               \
+  }
 
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread)                       \
-  profiler->partitionsGroups[thread]->stop()
+#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_RUNS_COUNTER               \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    ++profiler->multithreadedRuns;                                            \
+  }
+
+#define SCHEDULER_PROFILER_INITIALIZATION_START                               \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->initialization.start();                                         \
+  }
+
+#define SCHEDULER_PROFILER_INITIALIZATION_STOP                                \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->initialization.stop();                                          \
+  }
+
+#define SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread)                     \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->partitionsGroups[thread]->start();                              \
+    profiler->partitionsGroupsCounters[thread]++;                             \
+  }
+
+#define SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread)                      \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    profiler->partitionsGroups[thread]->stop();                               \
+  }
+// clang-format on
 
 #else
 
-#define SCHEDULER_PROFILER_DO_NOTHING static_assert(true)
+#define SCHEDULER_PROFILER_DO_NOTHING static_assert(true);
 
 #define SCHEDULER_PROFILER_ADD_EQUATION_START SCHEDULER_PROFILER_DO_NOTHING
 #define SCHEDULER_PROFILER_ADD_EQUATION_STOP SCHEDULER_PROFILER_DO_NOTHING
@@ -179,14 +211,16 @@ Scheduler::Scheduler() {
   identifier = getUniqueSchedulerIdentifier();
 
 #ifdef MARCO_PROFILING
-  ThreadPool &threadPool = getSchedulersThreadPool();
-  unsigned int numOfThreads = threadPool.getNumOfThreads();
+  if (simulation::getOptions().profiling) {
+    ThreadPool &threadPool = getSchedulersThreadPool();
+    unsigned int numOfThreads = threadPool.getNumOfThreads();
 
-  profiler = std::make_shared<SchedulerProfiler>(identifier);
-  profiler->createPartitionsGroupsCounters(numOfThreads);
-  profiler->createPartitionsGroupsTimers(numOfThreads);
+    profiler = std::make_shared<SchedulerProfiler>(identifier);
+    profiler->createPartitionsGroupsCounters(numOfThreads);
+    profiler->createPartitionsGroupsTimers(numOfThreads);
 
-  registerProfiler(profiler);
+    registerProfiler(profiler);
+  }
 #endif
 }
 

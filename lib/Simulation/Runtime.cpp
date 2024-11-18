@@ -96,7 +96,9 @@ void Simulation::setPrinter(Printer *newPrinter) {
 namespace {
 Simulation runtimeInit() {
 #ifdef MARCO_PROFILING
-  profilingInit();
+  if (simulation::getOptions().profiling) {
+    profilingInit();
+  }
 #endif
 
   Simulation result;
@@ -216,7 +218,9 @@ Simulation runtimeInit() {
 
 void runtimeDeinit(Simulation &simulationInfo) {
 #ifdef MARCO_PROFILING
-  printProfilingStats();
+  if (simulation::getOptions().profiling) {
+    printProfilingStats();
+  }
 #endif
 }
 } // namespace
@@ -234,7 +238,7 @@ void runtimeDeinit(Simulation &simulationInfo) {
 
   // Parse the command-line arguments.
 #ifdef CLI_ENABLE
-  SIMULATION_PROFILER_ARG_START;
+  SIMULATION_PROFILER_ARG_START
   auto &cli = getCLI();
   cli += simulation::getCLIOptions();
 
@@ -256,12 +260,12 @@ void runtimeDeinit(Simulation &simulationInfo) {
     cli[i].parseCommandLineOptions(cmdl);
   }
 
-  SIMULATION_PROFILER_ARG_STOP;
+  SIMULATION_PROFILER_ARG_STOP
 #endif // CLI_ENABLE
 
-  SIMULATION_PROFILER_INIT_START;
+  SIMULATION_PROFILER_INIT_START
   init();
-  SIMULATION_PROFILER_INIT_STOP;
+  SIMULATION_PROFILER_INIT_STOP
 
   // Set the start time.
   setTime(simulation::getOptions().startTime);
@@ -270,20 +274,20 @@ void runtimeDeinit(Simulation &simulationInfo) {
   simulation.getPrinter()->simulationBegin();
 
   // Compute the initial conditions and print their values.
-  SIMULATION_PROFILER_INITIAL_MODEL_START;
+  SIMULATION_PROFILER_INITIAL_MODEL_START
   icModelBegin();
   solveICModel();
   icModelEnd();
-  SIMULATION_PROFILER_INITIAL_MODEL_STOP;
+  SIMULATION_PROFILER_INITIAL_MODEL_STOP
 
   simulation.getPrinter()->printValues();
 
   // Solve the dynamic model.
-  SIMULATION_PROFILER_DYNAMIC_MODEL_START;
+  SIMULATION_PROFILER_DYNAMIC_MODEL_START
   dynamicModelBegin();
   int result = driver->run();
   dynamicModelEnd();
-  SIMULATION_PROFILER_DYNAMIC_MODEL_STOP;
+  SIMULATION_PROFILER_DYNAMIC_MODEL_STOP
 
   // Tell the printer that the simulation has finished.
   simulation.getPrinter()->simulationEnd();

@@ -35,13 +35,13 @@ int RungeKutta::run() {
     double error;
 
     do {
-      RUNGEKUTTA_PROFILER_STATEVAR_START;
+      RUNGEKUTTA_PROFILER_STATEVAR_START
       tryStep(timeStep);
-      RUNGEKUTTA_PROFILER_STATEVAR_STOP;
+      RUNGEKUTTA_PROFILER_STATEVAR_STOP
 
-      RUNGEKUTTA_PROFILER_ERROR_START;
+      RUNGEKUTTA_PROFILER_ERROR_START
       error = estimateError();
-      RUNGEKUTTA_PROFILER_ERROR_STOP;
+      RUNGEKUTTA_PROFILER_ERROR_STOP
 
       if (error >= rungekutta::getOptions().tolerance) {
         timeStep /= 2;
@@ -61,9 +61,9 @@ int RungeKutta::run() {
     // Update the time.
     setTime(time + timeStep);
 
-    RUNGEKUTTA_PROFILER_VARCOPY_START;
+    RUNGEKUTTA_PROFILER_VARCOPY_START
     acceptStep();
-    RUNGEKUTTA_PROFILER_VARCOPY_STOP;
+    RUNGEKUTTA_PROFILER_VARCOPY_STOP
 
     if (iteration == 1) {
       // The time step was big enough to converge in only one iteration.
@@ -77,9 +77,9 @@ int RungeKutta::run() {
                 << std::endl;
     }
 
-    RUNGEKUTTA_PROFILER_NONSTATEVAR_START;
+    RUNGEKUTTA_PROFILER_NONSTATEVAR_START
     updateNonStateVariables();
-    RUNGEKUTTA_PROFILER_NONSTATEVAR_STOP;
+    RUNGEKUTTA_PROFILER_NONSTATEVAR_STOP
 
     if (marco::runtime::simulation::getOptions().debug) {
       std::cerr << "[Runge-Kutta] Printing values" << std::endl;

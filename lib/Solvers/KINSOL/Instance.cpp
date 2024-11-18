@@ -512,7 +512,7 @@ bool KINSOLInstance::solve() {
 
 int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
                                      void *userData) {
-  KINSOL_PROFILER_RESIDUALS_CALL_COUNTER_INCREMENT;
+  KINSOL_PROFILER_RESIDUALS_CALL_COUNTER_INCREMENT
 
   realtype *rval = N_VGetArrayPointer(residuals);
   auto *instance = static_cast<KINSOLInstance *>(userData);
@@ -524,7 +524,7 @@ int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
 
   // For every vectorized equation, set the residual values of the variables
   // it writes into.
-  KINSOL_PROFILER_RESIDUALS_START;
+  KINSOL_PROFILER_RESIDUALS_START
 
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
@@ -545,7 +545,7 @@ int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
         *(rval + offset) = residualFunctionResult;
       });
 
-  KINSOL_PROFILER_RESIDUALS_STOP;
+  KINSOL_PROFILER_RESIDUALS_STOP
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Residuals function called" << std::endl;
@@ -561,7 +561,7 @@ int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
 int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
                                    SUNMatrix jacobianMatrix, void *userData,
                                    N_Vector tempv1, N_Vector tempv2) {
-  KINSOL_PROFILER_PARTIAL_DERIVATIVES_CALL_COUNTER_INCREMENT;
+  KINSOL_PROFILER_PARTIAL_DERIVATIVES_CALL_COUNTER_INCREMENT
 
   realtype *jacobian = SUNSparseMatrix_Data(jacobianMatrix);
   auto *instance = static_cast<KINSOLInstance *>(userData);
@@ -571,7 +571,7 @@ int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
   // the current iteration values.
   instance->copyVariablesIntoMARCO(variables);
 
-  KINSOL_PROFILER_PARTIAL_DERIVATIVES_START;
+  KINSOL_PROFILER_PARTIAL_DERIVATIVES_START
 
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
@@ -647,7 +647,7 @@ int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
   assert(jacobian ==
          SUNSparseMatrix_Data(jacobianMatrix) + instance->nonZeroValuesNumber);
 
-  KINSOL_PROFILER_PARTIAL_DERIVATIVES_STOP;
+  KINSOL_PROFILER_PARTIAL_DERIVATIVES_STOP
 
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Jacobian matrix function called" << std::endl;
@@ -899,7 +899,7 @@ void KINSOLInstance::copyVariablesFromMARCO(N_Vector variables) {
     std::cerr << "[KINSOL] Copying variables from MARCO" << std::endl;
   }
 
-  KINSOL_PROFILER_COPY_VARS_FROM_MARCO_START;
+  KINSOL_PROFILER_COPY_VARS_FROM_MARCO_START
 
   realtype *varsPtr = N_VGetArrayPointer(variables);
   uint64_t numOfArrayVariables = getNumOfArrayVariables();
@@ -931,7 +931,7 @@ void KINSOLInstance::copyVariablesFromMARCO(N_Vector variables) {
     } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
   }
 
-  KINSOL_PROFILER_COPY_VARS_FROM_MARCO_STOP;
+  KINSOL_PROFILER_COPY_VARS_FROM_MARCO_STOP
 }
 
 void KINSOLInstance::copyVariablesIntoMARCO(N_Vector variables) {
@@ -939,7 +939,7 @@ void KINSOLInstance::copyVariablesIntoMARCO(N_Vector variables) {
     std::cerr << "[KINSOL] Copying variables into MARCO" << std::endl;
   }
 
-  KINSOL_PROFILER_COPY_VARS_INTO_MARCO_START;
+  KINSOL_PROFILER_COPY_VARS_INTO_MARCO_START
 
   realtype *varsPtr = N_VGetArrayPointer(variables);
   uint64_t numOfArrayVariables = getNumOfArrayVariables();
@@ -976,7 +976,7 @@ void KINSOLInstance::copyVariablesIntoMARCO(N_Vector variables) {
     } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
   }
 
-  KINSOL_PROFILER_COPY_VARS_INTO_MARCO_STOP;
+  KINSOL_PROFILER_COPY_VARS_INTO_MARCO_STOP
 }
 
 void KINSOLInstance::equationsParallelIteration(

@@ -5,42 +5,61 @@
 
 #include "marco/Runtime/Profiling/Profiling.h"
 #include "marco/Runtime/Profiling/Timer.h"
+#include "marco/Runtime/Simulation/Options.h"
 #include <mutex>
 
-namespace marco::runtime::profiling
-{
-  class EulerForwardProfiler : public Profiler
-  {
-    public:
-      EulerForwardProfiler();
+namespace marco::runtime::profiling {
+class EulerForwardProfiler : public Profiler {
+public:
+  EulerForwardProfiler();
 
-      void reset() override;
+  void reset() override;
 
-      void print() const override;
+  void print() const override;
 
-    public:
-      Timer stateVariables;
-      Timer nonStateVariables;
+public:
+  Timer stateVariables;
+  Timer nonStateVariables;
 
-      mutable std::mutex mutex;
-  };
+  mutable std::mutex mutex;
+};
 
-  EulerForwardProfiler& eulerForwardProfiler();
-}
+EulerForwardProfiler &eulerForwardProfiler();
+} // namespace marco::runtime::profiling
 
-#define EULER_FORWARD_PROFILER_STATEVAR_START ::marco::runtime::profiling::eulerForwardProfiler().stateVariables.start();
-#define EULER_FORWARD_PROFILER_STATEVAR_STOP ::marco::runtime::profiling::eulerForwardProfiler().stateVariables.stop();
+// clang-format off
+#define EULER_FORWARD_PROFILER_STATEVAR_START                                   \
+  if (::marco::runtime::simulation::getOptions().profiling) {                   \
+    ::marco::runtime::profiling::eulerForwardProfiler().stateVariables.start(); \
+  }
 
-#define EULER_FORWARD_PROFILER_NONSTATEVAR_START ::marco::runtime::profiling::eulerForwardProfiler().nonStateVariables.start();
-#define EULER_FORWARD_PROFILER_NONSTATEVAR_STOP ::marco::runtime::profiling::eulerForwardProfiler().nonStateVariables.stop();
+#define EULER_FORWARD_PROFILER_STATEVAR_STOP                                   \
+  if (::marco::runtime::simulation::getOptions().profiling) {                  \
+    ::marco::runtime::profiling::eulerForwardProfiler().stateVariables.stop(); \
+  }
+
+#define EULER_FORWARD_PROFILER_NONSTATEVAR_START                                   \
+  if (::marco::runtime::simulation::getOptions().profiling) {                      \
+    ::marco::runtime::profiling::eulerForwardProfiler().nonStateVariables.start(); \
+  }
+
+#define EULER_FORWARD_PROFILER_NONSTATEVAR_STOP                                   \
+  if (::marco::runtime::simulation::getOptions().profiling) {                     \
+    ::marco::runtime::profiling::eulerForwardProfiler().nonStateVariables.stop(); \
+  }
+// clang-format on
 
 #else
 
-#define EULER_FORWARD_PROFILER_STATEVAR_START static_assert(true)
-#define EULER_FORWARD_PROFILER_STATEVAR_STOP static_assert(true)
+#define EULER_FORWARD_PROFILER_DO_NOTHING static_assert(true);
 
-#define EULER_FORWARD_PROFILER_NONSTATEVAR_START static_assert(true)
-#define EULER_FORWARD_PROFILER_NONSTATEVAR_STOP static_assert(true)
+#define EULER_FORWARD_PROFILER_STATEVAR_START EULER_FORWARD_PROFILER_DO_NOTHING
+#define EULER_FORWARD_PROFILER_STATEVAR_STOP EULER_FORWARD_PROFILER_DO_NOTHING
+
+#define EULER_FORWARD_PROFILER_NONSTATEVAR_START                               \
+  EULER_FORWARD_PROFILER_DO_NOTHING
+#define EULER_FORWARD_PROFILER_NONSTATEVAR_STOP                                \
+  EULER_FORWARD_PROFILER_DO_NOTHING
 
 #endif // MARCO_PROFILING
 

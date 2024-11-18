@@ -5,7 +5,6 @@
 #include "marco/Runtime/Simulation/Profiler.h"
 #include "marco/Runtime/Simulation/Runtime.h"
 #include <cassert>
-#include <iomanip>
 #include <iostream>
 
 using namespace ::marco::runtime;
@@ -13,24 +12,24 @@ using namespace ::marco::runtime::printing;
 
 static void printDerWrapOpening(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
-    PRINT_PROFILER_STRING_START;
+    PRINT_PROFILER_STRING_START
     std::cout << "der(";
-    PRINT_PROFILER_STRING_STOP;
+    PRINT_PROFILER_STRING_STOP
   }
 }
 
 static void printDerWrapClosing(int64_t order) {
   for (int64_t i = 0; i < order; ++i) {
-    PRINT_PROFILER_STRING_START;
+    PRINT_PROFILER_STRING_START
     std::cout << ')';
-    PRINT_PROFILER_STRING_STOP;
+    PRINT_PROFILER_STRING_STOP
   }
 }
 
 static void printName(char *name, int64_t rank, const int64_t *indices) {
-  PRINT_PROFILER_STRING_START;
+  PRINT_PROFILER_STRING_START
   std::cout << name;
-  PRINT_PROFILER_STRING_STOP;
+  PRINT_PROFILER_STRING_STOP
 
   if (rank != 0) {
     assert(indices != nullptr);
@@ -38,17 +37,17 @@ static void printName(char *name, int64_t rank, const int64_t *indices) {
 
     for (int64_t dim = 0; dim < rank; ++dim) {
       if (dim != 0) {
-        PRINT_PROFILER_STRING_START;
+        PRINT_PROFILER_STRING_START
         std::cout << ',';
-        PRINT_PROFILER_STRING_STOP;
+        PRINT_PROFILER_STRING_STOP
       }
 
       // Modelica arrays are 1-based, so increment the printed index by one.
       int64_t index = indices[dim] + 1;
 
-      PRINT_PROFILER_INT_START;
+      PRINT_PROFILER_INT_START
       std::cout << index;
-      PRINT_PROFILER_INT_STOP;
+      PRINT_PROFILER_INT_STOP
     }
 
     std::cout << ']';
@@ -56,9 +55,9 @@ static void printName(char *name, int64_t rank, const int64_t *indices) {
 }
 
 static void printHeader(const Simulation &simulation) {
-  PRINT_PROFILER_STRING_START;
+  PRINT_PROFILER_STRING_START
   std::cout << '"' << "time" << '"';
-  PRINT_PROFILER_STRING_STOP;
+  PRINT_PROFILER_STRING_STOP
 
   for (int64_t var : simulation.variablesPrintOrder) {
     if (!simulation.printableVariables[var]) {
@@ -85,17 +84,17 @@ static void printHeader(const Simulation &simulation) {
 
     if (rank == 0) {
       // Print only the variable name.
-      PRINT_PROFILER_STRING_START;
+      PRINT_PROFILER_STRING_START
       std::cout << ',' << '"';
-      PRINT_PROFILER_STRING_STOP;
+      PRINT_PROFILER_STRING_STOP
 
       printDerWrapOpening(derOrder);
       printName(name, 0, nullptr);
       printDerWrapClosing(derOrder);
 
-      PRINT_PROFILER_STRING_START;
+      PRINT_PROFILER_STRING_START
       std::cout << '"';
-      PRINT_PROFILER_STRING_STOP;
+      PRINT_PROFILER_STRING_STOP
     } else {
       // Print the name of the array and the indices, for each possible
       // combination of printable indices.
@@ -105,25 +104,25 @@ static void printHeader(const Simulation &simulation) {
         auto endIt = MultidimensionalRangeIterator::end(range);
 
         for (auto it = beginIt; it != endIt; ++it) {
-          PRINT_PROFILER_STRING_START;
+          PRINT_PROFILER_STRING_START
           std::cout << ',' << '"';
-          PRINT_PROFILER_STRING_STOP;
+          PRINT_PROFILER_STRING_STOP
 
           printDerWrapOpening(derOrder);
           printName(name, rank, *it);
           printDerWrapClosing(derOrder);
 
-          PRINT_PROFILER_STRING_START;
+          PRINT_PROFILER_STRING_START
           std::cout << '"';
-          PRINT_PROFILER_STRING_STOP;
+          PRINT_PROFILER_STRING_STOP
         }
       }
     }
   }
 
-  PRINT_PROFILER_STRING_START;
+  PRINT_PROFILER_STRING_START
   std::cout << std::endl;
-  PRINT_PROFILER_STRING_STOP;
+  PRINT_PROFILER_STRING_STOP
 }
 
 namespace marco::runtime::printing {
@@ -144,9 +143,9 @@ std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions() {
 #endif // CLI_ENABLE
 
 void CSVPrinter::simulationBegin() {
-  SIMULATION_PROFILER_PRINTING_START;
+  SIMULATION_PROFILER_PRINTING_START
   ::printHeader(*getSimulation());
-  SIMULATION_PROFILER_PRINTING_STOP;
+  SIMULATION_PROFILER_PRINTING_STOP
 }
 
 void CSVPrinter::printValues() {
@@ -208,7 +207,7 @@ void CSVPrinter::initialize() {
 }
 
 void CSVPrinter::printBufferedValues(const double *values, uint64_t count) {
-  SIMULATION_PROFILER_PRINTING_START;
+  SIMULATION_PROFILER_PRINTING_START
 
   auto &options = printOptions();
   std::cout.precision(options.precision);
@@ -220,22 +219,22 @@ void CSVPrinter::printBufferedValues(const double *values, uint64_t count) {
   }
 
   for (uint64_t i = 0; i < count; ++i) {
-    PRINT_PROFILER_FLOAT_START;
+    PRINT_PROFILER_FLOAT_START
     std::cout << values[i];
-    PRINT_PROFILER_FLOAT_STOP;
+    PRINT_PROFILER_FLOAT_STOP
 
     if (i + 1 != count) {
-      PRINT_PROFILER_STRING_START;
+      PRINT_PROFILER_STRING_START
       std::cout << ',';
-      PRINT_PROFILER_STRING_STOP;
+      PRINT_PROFILER_STRING_STOP
     }
   }
 
-  PRINT_PROFILER_STRING_START;
+  PRINT_PROFILER_STRING_START
   std::cout << std::endl;
-  PRINT_PROFILER_STRING_STOP;
+  PRINT_PROFILER_STRING_STOP
 
-  SIMULATION_PROFILER_PRINTING_STOP;
+  SIMULATION_PROFILER_PRINTING_STOP
 }
 } // namespace marco::runtime::printing
 

@@ -4,41 +4,42 @@
 #include <chrono>
 #include <mutex>
 
-namespace marco::runtime::profiling
-{
-  class Timer
-  {
-    public:
-      Timer();
+namespace marco::runtime::profiling {
+class Timer {
+public:
+  Timer();
 
-      Timer(const Timer& other) = delete;
+  Timer(const Timer &other) = delete;
 
-      Timer& operator=(const Timer& other) = delete;
+  Timer &operator=(const Timer &other) = delete;
 
-      void start();
+  void start();
 
-      void stop();
+  void stop();
 
-      void reset();
+  void reset();
 
-      template<typename Period = std::nano, typename Rep = double>
-      Rep totalElapsedTime() const
-      {
-        auto casted = static_cast<std::chrono::duration<Rep, Period>>(totalElapsed());
-        return casted.count();
-      }
+  template <typename Period = std::nano, typename Rep = double>
+  Rep totalElapsedTime() const {
+    auto casted =
+        static_cast<std::chrono::duration<Rep, Period>>(totalElapsed());
+    return casted.count();
+  }
 
-    private:
-      std::chrono::nanoseconds elapsed() const;
+private:
+  std::chrono::nanoseconds elapsed() const;
 
-      std::chrono::nanoseconds totalElapsed() const;
+  std::chrono::nanoseconds totalElapsed() const;
 
-    private:
-      int running_ = 0;
-      std::chrono::steady_clock::time_point start_;
-      std::chrono::nanoseconds accumulatedTime_;
-      mutable std::mutex mutex;
-  };
-}
+private:
+  int running_ = 0;
+  std::chrono::steady_clock::time_point start_;
+  std::chrono::nanoseconds accumulatedTime_;
+
+#ifdef THREADS_ENABLE
+  mutable std::mutex mutex;
+#endif
+};
+} // namespace marco::runtime::profiling
 
 #endif // MARCO_RUNTIME_PROFILING_TIMER_H

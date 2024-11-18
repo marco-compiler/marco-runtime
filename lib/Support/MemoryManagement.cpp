@@ -10,6 +10,7 @@ using namespace ::marco::runtime;
 
 #include "marco/Runtime/Profiling/Profiling.h"
 #include "marco/Runtime/Profiling/Timer.h"
+#include "marco/Runtime/Simulation/Options.h"
 #include <iostream>
 #include <map>
 #include <mutex>
@@ -120,7 +121,7 @@ private:
 } // namespace marco::runtime::profiling
 
 namespace {
-marco::runtime::profiling::MemoryProfiler &profiler() {
+marco::runtime::profiling::MemoryProfiler &memoryProfiler() {
   static marco::runtime::profiling::MemoryProfiler obj;
   return obj;
 }
@@ -130,14 +131,18 @@ marco::runtime::profiling::MemoryProfiler &profiler() {
 
 void *marco_malloc(int64_t sizeInBytes) {
 #ifdef MARCO_PROFILING
-  ::profiler().startTimer();
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().startTimer();
+  }
 #endif
 
   void *result = sizeInBytes == 0 ? nullptr : std::malloc(sizeInBytes);
 
 #ifdef MARCO_PROFILING
-  ::profiler().stopTimer();
-  ::profiler().malloc(result, sizeInBytes);
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().stopTimer();
+    ::memoryProfiler().malloc(result, sizeInBytes);
+  }
 #endif
 
   return result;
@@ -145,14 +150,18 @@ void *marco_malloc(int64_t sizeInBytes) {
 
 void *marco_realloc(void *ptr, int64_t sizeInBytes) {
 #ifdef MARCO_PROFILING
-  ::profiler().startTimer();
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().startTimer();
+  }
 #endif
 
   void *result = sizeInBytes == 0 ? nullptr : std::realloc(ptr, sizeInBytes);
 
 #ifdef MARCO_PROFILING
-  ::profiler().stopTimer();
-  ::profiler().realloc(ptr, result, sizeInBytes);
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().stopTimer();
+    ::memoryProfiler().realloc(ptr, result, sizeInBytes);
+  }
 #endif
 
   return result;
@@ -160,8 +169,10 @@ void *marco_realloc(void *ptr, int64_t sizeInBytes) {
 
 void marco_free(void *ptr) {
 #ifdef MARCO_PROFILING
-  ::profiler().free(ptr);
-  ::profiler().startTimer();
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().free(ptr);
+    ::memoryProfiler().startTimer();
+  }
 #endif
 
   if (ptr != nullptr) {
@@ -169,9 +180,12 @@ void marco_free(void *ptr) {
   }
 
 #ifdef MARCO_PROFILING
-  ::profiler().stopTimer();
+  if (::marco::runtime::simulation::getOptions().profiling) {
+    ::memoryProfiler().stopTimer();
+  }
 #endif
 }
+
 #include <iostream>
 namespace marco::runtime {
 

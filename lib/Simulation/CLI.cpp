@@ -10,6 +10,7 @@ std::string CommandLineOptions::getTitle() const { return "General"; }
 void CommandLineOptions::printCommandLineOptions(std::ostream &os) const {
   // clang-format off
   os << "  --debug                          Enable the debug messages." << std::endl;
+  os << "  --profile                        Enable the profilers." << std::endl;
 
   os << "  --start-time=<value>             Set the start time (in seconds). Defaults to " << getOptions().startTime << "." << std::endl;
   os << "  --end-time=<value>               Set the end time (in seconds). Defaults to " << getOptions().endTime << "." << std::endl;
@@ -23,6 +24,7 @@ void CommandLineOptions::parseCommandLineOptions(
     const argh::parser &options) const {
   // clang-format off
   getOptions().debug = options["debug"];
+  getOptions().profiling = options["profile"];
 
   options("start-time") >> getOptions().startTime;
   options("end-time") >> getOptions().endTime;
