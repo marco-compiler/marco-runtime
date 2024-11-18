@@ -29,7 +29,7 @@ void DoubleBuffer::flush() {
   if (currentLine > 0) {
     std::swap(inputBuffer, outputBuffer);
 
-    for (uint64_t line = 0; line < lines; ++line) {
+    for (uint64_t line = 0; line < currentLine; ++line) {
       callback(outputBuffer.data() + line * lineElementsCount,
                lineElementsCount);
     }
