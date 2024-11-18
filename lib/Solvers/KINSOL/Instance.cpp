@@ -529,8 +529,7 @@ int KINSOLInstance::residualFunction(N_Vector variables, N_Vector residuals,
   instance->equationsParallelIteration(
       [&](Equation eq, const std::vector<int64_t> &equationIndices,
           const JacobianSeedsMap &jacobianSeedsMap) {
-        uint64_t equationRank = instance->getEquationRank(eq);
-        assert(equationIndices.size() == equationRank);
+        assert(equationIndices.size() == instance->getEquationRank(eq));
 
         uint64_t equationArrayOffset = instance->equationOffsets[eq];
 
