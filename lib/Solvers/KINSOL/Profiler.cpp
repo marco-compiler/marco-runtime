@@ -35,6 +35,18 @@ namespace marco::runtime::profiling
     std::cerr << "Time spent on copying the variables into MARCO: " << copyVarsIntoMARCOTimer.totalElapsedTime() << " ms\n";
   }
 
+  void KINSOLProfiler::incrementResidualsCallCounter()
+  {
+    std::lock_guard<std::mutex> lockGuard(mutex);
+    ++residualsCallCounter;
+  }
+
+  void KINSOLProfiler::incrementPartialDerivativesCallCounter()
+  {
+    std::lock_guard<std::mutex> lockGuard(mutex);
+    ++partialDerivativesCallCounter;
+  }
+
   KINSOLProfiler& kinsolProfiler()
   {
     static KINSOLProfiler obj;
