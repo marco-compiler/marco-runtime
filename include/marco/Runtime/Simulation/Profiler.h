@@ -18,7 +18,6 @@ public:
   void print() const override;
 
 public:
-  Timer commandLineArgs;
   Timer initialization;
   Timer initialModel;
   Timer dynamicModel;
@@ -31,16 +30,6 @@ SimulationProfiler &simulationProfiler();
 } // namespace marco::runtime::profiling
 
 // clang-format off
-#define SIMULATION_PROFILER_ARG_START                                          \
-  if (::marco::runtime::simulation::getOptions().profiling) {                  \
-    ::marco::runtime::profiling::simulationProfiler().commandLineArgs.start(); \
-  }
-
-#define SIMULATION_PROFILER_ARG_STOP                                          \
-  if (::marco::runtime::simulation::getOptions().profiling) {                 \
-    ::marco::runtime::profiling::simulationProfiler().commandLineArgs.stop(); \
-  }
-
 #define SIMULATION_PROFILER_INIT_START                                        \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
     ::marco::runtime::profiling::simulationProfiler().initialization.start(); \
@@ -85,9 +74,6 @@ SimulationProfiler &simulationProfiler();
 #else
 
 #define SIMULATION_PROFILER_DO_NOTHING static_assert(true);
-
-#define SIMULATION_PROFILER_ARG_START SIMULATION_PROFILER_DO_NOTHING
-#define SIMULATION_PROFILER_ARG_STOP SIMULATION_PROFILER_DO_NOTHING
 
 #define SIMULATION_PROFILER_INIT_START SIMULATION_PROFILER_DO_NOTHING
 #define SIMULATION_PROFILER_INIT_STOP SIMULATION_PROFILER_DO_NOTHING

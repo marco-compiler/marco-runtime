@@ -3,31 +3,19 @@
 
 using namespace ::marco::runtime::profiling;
 
-static Statistics& statistics()
-{
+static Statistics &statistics() {
   static Statistics obj;
   return obj;
 }
 
-namespace marco::runtime
-{
-  void profilingInit()
-  {
-    ::statistics().reset();
-  }
+namespace marco::runtime {
+void printProfilingStats() { ::statistics().print(); }
 
-  void printProfilingStats()
-  {
-    ::statistics().print();
-  }
-
-  void registerProfiler(Profiler& profiler)
-  {
-    ::statistics().registerProfiler(profiler);
-  }
-
-  void registerProfiler(std::shared_ptr<Profiler> profiler)
-  {
-    ::statistics().registerProfiler(profiler);
-  }
+void registerProfiler(Profiler &profiler) {
+  ::statistics().registerProfiler(profiler);
 }
+
+void registerProfiler(std::shared_ptr<Profiler> profiler) {
+  ::statistics().registerProfiler(profiler);
+}
+} // namespace marco::runtime

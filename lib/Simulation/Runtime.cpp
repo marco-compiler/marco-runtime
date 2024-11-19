@@ -95,12 +95,6 @@ void Simulation::setPrinter(Printer *newPrinter) {
 
 namespace {
 Simulation runtimeInit() {
-#ifdef MARCO_PROFILING
-  if (simulation::getOptions().profiling) {
-    profilingInit();
-  }
-#endif
-
   Simulation result;
 
   // Number of array variables of the model (both state and algebraic ones).
@@ -238,7 +232,6 @@ void runtimeDeinit(Simulation &simulationInfo) {
 
   // Parse the command-line arguments.
 #ifdef CLI_ENABLE
-  SIMULATION_PROFILER_ARG_START
   auto &cli = getCLI();
   cli += simulation::getCLIOptions();
 
@@ -259,8 +252,6 @@ void runtimeDeinit(Simulation &simulationInfo) {
   for (size_t i = 0; i < cli.size(); ++i) {
     cli[i].parseCommandLineOptions(cmdl);
   }
-
-  SIMULATION_PROFILER_ARG_STOP
 #endif // CLI_ENABLE
 
   SIMULATION_PROFILER_INIT_START
