@@ -25,12 +25,12 @@ public:
 
 public:
   Timer initialConditionsTimer;
-  int64_t stepsCounter;
+  int64_t stepsCounter{0};
   Timer stepsTimer;
   Timer algebraicVariablesTimer;
-  int64_t residualsCallCounter;
+  int64_t residualsCallCounter{0};
   Timer residualsTimer;
-  int64_t partialDerivativesCallCounter;
+  int64_t partialDerivativesCallCounter{0};
   Timer partialDerivativesTimer;
   Timer copyVarsFromMARCOTimer;
   Timer copyVarsIntoMARCOTimer;

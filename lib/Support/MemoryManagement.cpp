@@ -107,12 +107,12 @@ private:
   double time() const { return timer.totalElapsedTime<std::milli>(); }
 
 private:
-  size_t mallocCalls;
-  size_t reallocCalls;
-  size_t freeCalls;
-  int64_t totalHeapMemory;
-  int64_t currentHeapMemory;
-  int64_t peakHeapMemory;
+  size_t mallocCalls{0};
+  size_t reallocCalls{0};
+  size_t freeCalls{0};
+  int64_t totalHeapMemory{0};
+  int64_t currentHeapMemory{0};
+  int64_t peakHeapMemory{0};
   std::map<void *, int64_t> sizes;
   Timer timer;
 

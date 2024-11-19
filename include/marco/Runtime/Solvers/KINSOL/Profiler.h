@@ -22,9 +22,9 @@ public:
   void incrementPartialDerivativesCallCounter();
 
 public:
-  int64_t residualsCallCounter;
+  int64_t residualsCallCounter{0};
   Timer residualsTimer;
-  int64_t partialDerivativesCallCounter;
+  int64_t partialDerivativesCallCounter{0};
   Timer partialDerivativesTimer;
   Timer copyVarsFromMARCOTimer;
   Timer copyVarsIntoMARCOTimer;
