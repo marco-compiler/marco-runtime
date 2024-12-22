@@ -1,6 +1,7 @@
 #include "marco/Runtime/Simulation/Runtime.h"
 #include "marco/Runtime/CLI/CLI.h"
 #include "marco/Runtime/Drivers/Driver.h"
+#include "marco/Runtime/Drivers/KINSOL/CLI.h"
 #include "marco/Runtime/Multithreading/CLI.h"
 #include "marco/Runtime/Printers/Printer.h"
 #include "marco/Runtime/Profiling/Profiling.h"
@@ -240,6 +241,11 @@ void runtimeDeinit(Simulation &simulationInfo) {
 #endif
 
   cli += driver->getCLIOptions();
+
+#ifdef SHARED_DEPS
+  cli += std::make_unique<sundials::kinsol::CommandLineOptions>();
+#endif
+
   cli += printer->getCLIOptions();
 
   argh::parser cmdl(argc, argv);
