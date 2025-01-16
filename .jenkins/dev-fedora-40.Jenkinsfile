@@ -1,5 +1,5 @@
 String configName = "fedora-40"
-String dockerfile = "dev-fedora-40.Dockerfile"
+String dockerfile = "fedora-40.Dockerfile"
 String checkName = "ci-" + configName
 
 publishChecks(name: checkName, status: 'QUEUED', summary: 'Queued')
@@ -31,6 +31,8 @@ node {
     String dockerArgs =
         " --build-arg LLVM_PARALLEL_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}" +
         " --build-arg LLVM_PARALLEL_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}" +
+        " --build-arg LLVM_BUILD_TYPE=Release" +
+        " --build-arg LLVM_ENABLE_ASSERTIONS=ON" +
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 

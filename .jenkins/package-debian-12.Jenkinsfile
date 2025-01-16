@@ -1,5 +1,5 @@
 String configName = "debian-12"
-String dockerfile = "prod-debian-12.Dockerfile"
+String dockerfile = "debian-12.Dockerfile"
 String checkName = "package-debian-12"
 
 publishChecks(name: checkName, status: 'QUEUED', summary: 'Queued')
@@ -30,6 +30,8 @@ node {
     String dockerArgs =
         " --build-arg LLVM_PARALLEL_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}" +
         " --build-arg LLVM_PARALLEL_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}" +
+        " --build-arg LLVM_BUILD_TYPE=Release" +
+        " --build-arg LLVM_ENABLE_ASSERTIONS=OFF" +
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 
