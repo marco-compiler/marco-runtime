@@ -1,0 +1,39 @@
+github:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+
+jenkins:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .jenkins/**
+          - '**/*.Jenkinsfile'
+
+docker:
+  - changed_files:
+      - any-glob-to-any-file:
+          - '**/*.Dockerfile'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - '**/*.md'
+
+driver:
+  - changed-files:
+      - any-glob-to-any-file:
+          - include/marco/Runtime/Drivers/**
+          - lib/Drivers/**
+
+solver:
+  - changed-files:
+      - any-glob-to-any-file:
+          - include/marco/Runtime/Solvers/**
+          - lib/Solvers/**
+
+support-library:
+  - changed-files:
+      - any-glob-to-any-file:
+          - include/marco/Runtime/Support/**
+          - lib/Support/**
