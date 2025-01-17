@@ -27,7 +27,7 @@ node {
         }
     }
 
-    String dockerRuntimeImageName = 'marco-compiler/marco-runtime-dev-' + configName
+    String dockerRuntimeImageName = 'marco-compiler/marco-runtime-dev-debug-' + configName
 
     String dockerArgs =
         " --build-arg LLVM_PARALLEL_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}" +
