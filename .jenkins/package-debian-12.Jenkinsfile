@@ -1,8 +1,5 @@
 String configName = "debian-12"
 String dockerfile = "debian-12.Dockerfile"
-String checkName = "package-debian-12"
-
-publishChecks(name: checkName, status: 'QUEUED', summary: 'Queued')
 
 node {
     agent {
@@ -35,8 +32,6 @@ node {
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 
-    publishChecks(name: checkName, status: 'IN_PROGRESS', summary: 'In progress')
-
     def dockerImage
 
     stage('Docker image') {
@@ -44,27 +39,23 @@ node {
     }
 
     dockerImage.inside() {
-        withChecks(name: checkName) {
-            stage("OS information") {
-                sh "cat /etc/os-release"
-            }
+        stage("OS information") {
+            sh "cat /etc/os-release"
+        }
 
-            stage('Configure') {
-                cmake arguments: "-S " + runtimeSrcPath + " -B " + runtimeBuildPath + " -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_INSTALL_PREFIX=" + runtimeInstallPath, installation: 'InSearchPath', label: 'Configure'
-            }
+        stage('Configure') {
+            cmake arguments: "-S " + runtimeSrcPath + " -B " + runtimeBuildPath + " -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_INSTALL_PREFIX=" + runtimeInstallPath, installation: 'InSearchPath', label: 'Configure'
+        }
 
-            stage('Install') {
-                cmake arguments: "--build " + runtimeBuildPath + " --target install", installation: 'InSearchPath', label: 'Install'
-            }
+        stage('Install') {
+            cmake arguments: "--build " + runtimeBuildPath + " --target install", installation: 'InSearchPath', label: 'Install'
+        }
 
-            stage('Package') {
-                sh "chmod +x " + runtimeSrcPath + "/.jenkins/package/" + configName + "/build.sh"
-                sh runtimeSrcPath + "/.jenkins/package/" + configName + "/build.sh " + runtimeSrcPath + " " + runtimeInstallPath
+        stage('Package') {
+            sh "chmod +x " + runtimeSrcPath + "/.jenkins/package/" + configName + "/build.sh"
+            sh runtimeSrcPath + "/.jenkins/package/" + configName + "/build.sh " + runtimeSrcPath + " " + runtimeInstallPath
 
-                sshPublisher(publishers: [sshPublisherDesc(configName: 'marco-package', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: configName + "/amd64", remoteDirectorySDF: false, sourceFiles: '*.deb')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
-            }
+            sshPublisher(publishers: [sshPublisherDesc(configName: 'marco-package', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: configName + "/amd64", remoteDirectorySDF: false, sourceFiles: '*.deb')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
         }
     }
-
-    publishChecks(name: checkName, conclusion: 'SUCCESS', summary: 'Completed')
 }

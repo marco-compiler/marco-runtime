@@ -1,8 +1,5 @@
 String configName = "debian-12"
 String dockerfile = "debian-12.Dockerfile"
-String checkName = "ci-" + configName
-
-publishChecks(name: checkName, status: 'QUEUED', summary: 'Queued')
 
 node {
     agent {
@@ -36,8 +33,6 @@ node {
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 
-    publishChecks(name: checkName, status: 'IN_PROGRESS', summary: 'In progress')
-
     def dockerImage
 
     stage("Docker image") {
@@ -45,28 +40,24 @@ node {
     }
 
     dockerImage.inside() {
-        withChecks(name: checkName) {
-            stage("OS information") {
-                sh "cat /etc/os-release"
-            }
+        stage("OS information") {
+            sh "cat /etc/os-release"
+        }
 
-            stage('Configure') {
-                cmake arguments: "-S " + runtimeSrcPath + " -B " + runtimeBuildPath + " -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_INSTALL_PREFIX=" + runtimeInstallPath, installation: 'InSearchPath', label: 'Configure'
-            }
+        stage('Configure') {
+            cmake arguments: "-S " + runtimeSrcPath + " -B " + runtimeBuildPath + " -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_LINKER_TYPE=MOLD -DCMAKE_INSTALL_PREFIX=" + runtimeInstallPath, installation: 'InSearchPath', label: 'Configure'
+        }
 
-            stage('Build') {
-                cmake arguments: "--build " + runtimeBuildPath, installation: 'InSearchPath', label: 'Build'
-            }
+        stage('Build') {
+            cmake arguments: "--build " + runtimeBuildPath, installation: 'InSearchPath', label: 'Build'
+        }
 
-            stage('Unit test') {
-                cmake arguments: "--build " + runtimeBuildPath + " --target test", installation: 'InSearchPath', label: 'Unit tests'
-            }
+        stage('Unit test') {
+            cmake arguments: "--build " + runtimeBuildPath + " --target test", installation: 'InSearchPath', label: 'Unit tests'
+        }
 
-            stage('Install') {
-                cmake arguments: "--build " + runtimeBuildPath + " --target install", installation: 'InSearchPath', label: 'Install'
-            }
+        stage('Install') {
+            cmake arguments: "--build " + runtimeBuildPath + " --target install", installation: 'InSearchPath', label: 'Install'
         }
     }
-
-    publishChecks(name: checkName, conclusion: 'SUCCESS', summary: 'Completed')
 }
