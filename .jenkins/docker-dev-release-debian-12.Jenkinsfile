@@ -20,7 +20,6 @@ node {
         dir(runtimeSrcPath) {
             def scmVars = checkout(scm)
             env.GIT_COMMIT = scmVars.GIT_COMMIT
-            tag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
         }
     }
 
@@ -43,11 +42,6 @@ node {
     docker.withRegistry('https://ghcr.io', 'marco-ci') {
         stage('Publish') {
             dockerImage.push()
-
-            if (tag != "") {
-                dockerImage.push(tag)
-            }
-
             dockerImage.push("latest")
         }
     }
