@@ -32,8 +32,6 @@ node {
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 
-    def dockerImage
-
     stage('Docker image') {
         dockerImage = docker.build(dockerRuntimeImageName + ':latest', dockerArgs)
     }

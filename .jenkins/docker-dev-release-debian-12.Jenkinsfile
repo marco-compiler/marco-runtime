@@ -33,8 +33,6 @@ node {
         " -f " + runtimeSrcPath + "/.jenkins/" + dockerfile +
         " " + runtimeSrcPath + "/.jenkins";
 
-    def dockerImage
-
     stage('Build') {
         dockerImage = docker.build(dockerRuntimeImageName + ":" + env.GIT_COMMIT[0..6], dockerArgs)
     }
