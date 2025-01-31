@@ -10,6 +10,7 @@ marco_add_runtime_static_library(OptionsMultithreading_static
 
 # Main library.
 marco_add_runtime_static_library(Multithreading
+    Barrier.cpp
     CLI.cpp
     ThreadPool.cpp)
 
