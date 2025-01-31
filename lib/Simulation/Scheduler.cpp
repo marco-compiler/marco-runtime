@@ -1,4 +1,5 @@
 #include "marco/Runtime/Simulation/Scheduler.h"
+#include "marco/Runtime/Multithreading/Barrier.h"
 #include "marco/Runtime/Multithreading/ThreadPool.h"
 #include "marco/Runtime/Simulation/Options.h"
 #include <algorithm>
@@ -167,6 +168,96 @@ void SchedulerProfiler::print() const {
 #endif
 
 //===---------------------------------------------------------------------===//
+// EquationPartition
+//===---------------------------------------------------------------------===//
+
+namespace marco::runtime {
+void Scheduler::EquationPartition::run() {
+  assert(equation != nullptr);
+  equation->function(ranges.data());
+}
+} // namespace marco::runtime
+
+//===---------------------------------------------------------------------===//
+// BackwardEquation
+//===---------------------------------------------------------------------===//
+
+namespace marco::runtime {
+
+Scheduler::BackwardEquation::BackwardEquation(
+    const Scheduler::Equation &equation)
+    : equation(&equation) {}
+
+const Scheduler::Equation &Scheduler::BackwardEquation::getEquation() const {
+  assert(equation != nullptr);
+  return *equation;
+}
+
+void Scheduler::BackwardEquation::run(
+    unsigned int threadId,
+    std::function<std::optional<int64_t>(const Equation &, unsigned int)>
+        claimRowFn,
+    std::vector<char> *currentRowState, std::vector<char> *previousRowState) {
+  std::optional<int64_t> row = claimRowFn(*equation, threadId);
+
+  while (row) {
+    MultidimensionalRange rowRange = getRowBoundaries(*row);
+    std::vector<int64_t> indices = getBeginIndices(*row);
+    std::vector<int64_t> functionRanges;
+    functionRanges.resize(indices.size() * 2, 0xDEADF00D);
+
+    do {
+      // Compute the iteration boundaries that the equation function will use.
+      for (size_t dim = 0, rank = indices.size(); dim < rank; ++dim) {
+        functionRanges[dim * 2] = indices[dim];
+        functionRanges[dim * 2 + 1] = indices[dim] + 1;
+      }
+
+      int64_t column = indices[1];
+
+      if (previousRowState) {
+        while ((*previousRowState)[column] != 1) {
+          // Wait until the dependencies are satisfied.
+          // Synchronization is purposely not performed.
+          // Using chars guarantees consistency.
+        }
+      }
+
+      // Call the equation function on the specific grid cell.
+      equation->function(functionRanges.data());
+
+      // Mark the cell as processed, so that other threads can continue.
+      (*currentRowState)[column] = 1;
+    } while (advanceEquationIndices(indices, rowRange));
+
+    // Move to the next row.
+    row = claimRowFn(*equation, threadId);
+  }
+}
+
+MultidimensionalRange
+Scheduler::BackwardEquation::getRowBoundaries(int64_t row) const {
+  std::vector<Range> ranges;
+
+  ranges.emplace_back(equation->indices[0].begin + row,
+                      equation->indices[0].begin + row + 1);
+  ranges.push_back(equation->indices[1]);
+
+  return ranges;
+}
+
+std::vector<int64_t>
+Scheduler::BackwardEquation::getBeginIndices(int64_t row) const {
+  std::vector<int64_t> ranges;
+
+  ranges.push_back(equation->indices[0].begin + row);
+  ranges.push_back(equation->indices[1].begin);
+
+  return ranges;
+}
+} // namespace marco::runtime
+
+//===---------------------------------------------------------------------===//
 // Scheduler
 //===---------------------------------------------------------------------===//
 
@@ -183,8 +274,8 @@ static ThreadPool &getSchedulersThreadPool() {
   return instance;
 }
 
-static uint64_t
-getEquationPartitionFlatSize(const Scheduler::EquationPartition &partition) {
+static uint64_t getEquationPartitionFlatSize(
+    const Scheduler::ContiguousEquationPartition &partition) {
   int64_t result = 1;
 
   assert(partition.second.size() % 2 == 0);
@@ -203,9 +294,9 @@ getEquationPartitionFlatSize(const Scheduler::EquationPartition &partition) {
 namespace marco::runtime {
 Scheduler::Equation::Equation(EquationFunction function,
                               MultidimensionalRange indices,
-                              bool independentIndices)
+                              DependencyKind dependencyKind)
     : function(function), indices(std::move(indices)),
-      independentIndices(independentIndices) {}
+      dependencyKind(dependencyKind) {}
 
 Scheduler::Scheduler() {
   identifier = getUniqueSchedulerIdentifier();
@@ -225,7 +316,7 @@ Scheduler::Scheduler() {
 }
 
 void Scheduler::addEquation(EquationFunction function, uint64_t rank,
-                            int64_t *ranges, bool independentIndices) {
+                            int64_t *ranges, DependencyKind dependencyKind) {
   SCHEDULER_PROFILER_ADD_EQUATION_START;
   std::vector<Range> indices;
 
@@ -250,7 +341,7 @@ void Scheduler::addEquation(EquationFunction function, uint64_t rank,
     }
   }
 
-  equations.emplace_back(function, std::move(indices), independentIndices);
+  equations.emplace_back(function, std::move(indices), dependencyKind);
   SCHEDULER_PROFILER_ADD_EQUATION_STOP;
 }
 
@@ -281,7 +372,7 @@ void Scheduler::initialize() {
            "schedule");
 
     assert(std::all_of(sequentialSchedule.begin(), sequentialSchedule.end(),
-                       [&](const EquationPartition &partition) {
+                       [&](const ContiguousEquationPartition &partition) {
                          return checkEquationIndicesExistence(partition);
                        }) &&
            "Some nonexistent equation indices have been scheduled in the "
@@ -319,7 +410,7 @@ void Scheduler::initialize() {
                 << partitionsGroupMaxFlatSize << std::endl;
     }
 
-    EquationsGroup partitionsGroup;
+    ContiguousEquationsGroup partitionsGroup;
     size_t partitionsGroupFlatSize = 0;
 
     auto pushPartitionsGroupFn = [&]() {
@@ -369,7 +460,8 @@ void Scheduler::initialize() {
         std::cerr << "  - Total size: " << totalSize << std::endl;
       }
 
-      multithreadedSchedule.push_back(std::move(partitionsGroup));
+      multithreadedSchedule.contiguousEquations.push_back(
+          std::move(partitionsGroup));
       partitionsGroup.clear();
       partitionsGroupFlatSize = 0;
     };
@@ -395,15 +487,24 @@ void Scheduler::initialize() {
 
         std::cerr << std::endl;
         std::cerr << "  - Flat size: " << flatSize << std::endl;
+        std::cerr << "   - Dependency kind: ";
 
-        std::cerr << "  - Independent indices: "
-                  << (equation.independentIndices ? "true" : "false")
-                  << std::endl;
+        if (equation.dependencyKind == DependencyKind::Sequential) {
+          std::cerr << "sequential";
+        } else if (equation.dependencyKind == DependencyKind::Backward) {
+          std::cerr << "backward";
+        } else if (equation.dependencyKind ==
+                   DependencyKind::IndependentIndices) {
+          std::cerr << "independent indices";
+        } else {
+          std::cerr << "unknown";
+        }
 
+        std::cerr << std::endl;
         std::cerr << "  - Remaining space: " << remainingSpace << std::endl;
       }
 
-      if (equation.independentIndices) {
+      if (equation.dependencyKind == DependencyKind::IndependentIndices) {
         uint64_t equationFlatIndex = 0;
         size_t equationRank = equation.indices.size();
 
@@ -607,6 +708,8 @@ void Scheduler::initialize() {
             pushPartitionsGroupFn();
           }
         }
+      } else if (equation.dependencyKind == DependencyKind::Backward) {
+        multithreadedSchedule.backwardEquations.emplace_back(equation);
       } else {
         // All the indices must be visited by a single thread.
         std::vector<int64_t> ranges;
@@ -635,11 +738,11 @@ void Scheduler::initialize() {
                         << std::endl;
             }
 
-            EquationsGroup independentEquationsGroup;
-            independentEquationsGroup.emplace_back(equation, ranges);
+            ContiguousEquationsGroup separateEquationsGroup;
+            separateEquationsGroup.emplace_back(equation, ranges);
 
-            multithreadedSchedule.push_back(
-                std::move(independentEquationsGroup));
+            multithreadedSchedule.contiguousEquations.push_back(
+                std::move(separateEquationsGroup));
           } else {
             pushPartitionsGroupFn();
             partitionsGroup.emplace_back(equation, ranges);
@@ -660,17 +763,18 @@ void Scheduler::initialize() {
     assert(std::all_of(equations.begin(), equations.end(),
                        [&](const Equation &equation) {
                          return checkEquationScheduledExactlyOnce(
-                             equation, multithreadedSchedule);
+                             equation,
+                             multithreadedSchedule.contiguousEquations);
                        }) &&
            "Not all the equations are scheduled exactly once in the "
            "multithreaded schedule");
 
-    assert(std::all_of(multithreadedSchedule.begin(),
-                       multithreadedSchedule.end(),
-                       [&](const EquationsGroup &group) {
+    assert(std::all_of(multithreadedSchedule.contiguousEquations.begin(),
+                       multithreadedSchedule.contiguousEquations.end(),
+                       [&](const ContiguousEquationsGroup &group) {
                          return std::all_of(
                              group.begin(), group.end(),
-                             [&](const EquationPartition &partition) {
+                             [&](const ContiguousEquationPartition &partition) {
                                return checkEquationIndicesExistence(partition);
                              });
                        }) &&
@@ -697,8 +801,12 @@ void Scheduler::initialize() {
 
     if (auto forcedPolicy = simulation::getOptions().schedulerPolicy;
         !forcedPolicy || *forcedPolicy == SchedulerPolicy::Multithreaded) {
-      std::cerr << "  - Multithreaded schedule size: "
-                << multithreadedSchedule.size() << std::endl;
+      std::cerr << "  - Multithreaded schedule size: " << std::endl;
+      std::cerr << "    - Contiguous equations: "
+                << multithreadedSchedule.contiguousEquations.size()
+                << std::endl;
+      std::cerr << "    - Backward equations: "
+                << multithreadedSchedule.backwardEquations.size() << std::endl;
     }
   }
 
@@ -707,7 +815,7 @@ void Scheduler::initialize() {
 
 bool Scheduler::checkEquationScheduledExactlyOnce(
     const Equation &equation,
-    const std::vector<EquationsGroup> &schedule) const {
+    const std::vector<ContiguousEquationsGroup> &schedule) const {
   auto beginIndicesIt = MultidimensionalRangeIterator::begin(equation.indices);
 
   auto endIndicesIt = MultidimensionalRangeIterator::end(equation.indices);
@@ -723,10 +831,10 @@ bool Scheduler::checkEquationScheduledExactlyOnce(
 
     size_t count = 0;
 
-    for (const EquationsGroup &equationsGroup : schedule) {
+    for (const ContiguousEquationsGroup &equationsGroup : schedule) {
       count += std::count_if(
           equationsGroup.begin(), equationsGroup.end(),
-          [&](const EquationPartition &partition) {
+          [&](const ContiguousEquationPartition &partition) {
             if (partition.first.function != equation.function) {
               return false;
             }
@@ -753,7 +861,12 @@ bool Scheduler::checkEquationScheduledExactlyOnce(
 }
 
 bool Scheduler::checkEquationIndicesExistence(
-    const EquationPartition &partition) const {
+    const ContiguousEquationPartition &partition) const {
+  if (partition.first.dependencyKind == DependencyKind::Backward) {
+    // Backward equations are not pre-partitioned.
+    return true;
+  }
+
   const auto &equationIndices = partition.first.indices;
   assert(partition.second.size() % 2 == 0);
   size_t rank = partition.second.size() / 2;
@@ -826,7 +939,7 @@ void Scheduler::runSequential() {
   SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER;
   SCHEDULER_PROFILER_PARTITIONS_GROUP_START(0);
 
-  for (const EquationPartition &partition : sequentialSchedule) {
+  for (const ContiguousEquationPartition &partition : sequentialSchedule) {
     const Equation &equation = partition.first;
     const auto &ranges = partition.second;
     equation.function(ranges.data());
@@ -854,6 +967,8 @@ void Scheduler::runMultithreaded() {
 
   ThreadPool &threadPool = getSchedulersThreadPool();
   unsigned int numOfThreads = threadPool.getNumOfThreads();
+
+  // Run contiguous equations.
   std::atomic_size_t equationsGroupIndex = 0;
 
   for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
@@ -861,13 +976,13 @@ void Scheduler::runMultithreaded() {
       size_t assignedEquationsGroup;
 
       while ((assignedEquationsGroup = equationsGroupIndex++) <
-             multithreadedSchedule.size()) {
+             multithreadedSchedule.contiguousEquations.size()) {
         SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread);
 
         const auto &equationsGroup =
-            multithreadedSchedule[assignedEquationsGroup];
+            multithreadedSchedule.contiguousEquations[assignedEquationsGroup];
 
-        for (const EquationPartition &partition : equationsGroup) {
+        for (const ContiguousEquationPartition &partition : equationsGroup) {
           const Equation &equation = partition.first;
           const auto &ranges = partition.second;
           equation.function(ranges.data());
@@ -876,6 +991,81 @@ void Scheduler::runMultithreaded() {
         SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread);
       }
     });
+  }
+
+  threadPool.wait();
+
+  // Run backward equations.
+  std::mutex rowMutex;
+  int64_t row;
+
+  // Keeps track of the satisfied dependencies.
+  std::vector<std::vector<char>> rowStates;
+  rowStates.resize(2 * numOfThreads);
+
+  // Keeps track of which row state a thread is using.
+  std::vector<int64_t> threadToRowState;
+  threadToRowState.resize(numOfThreads, -1);
+
+  // Keeps track of whether a row is being used by a thread.
+  std::vector<bool> rowInUse;
+  rowInUse.resize(2 * numOfThreads, false);
+
+  // The identifier of the last assigned row state.
+  std::optional<size_t> lastAssignedRowState = std::nullopt;
+
+  auto findAvailableRowState = [&]() -> size_t {
+    for (size_t i = 0, e = rowInUse.size(); i < e; ++i) {
+      if (!rowInUse[i]) {
+        return i;
+      }
+    }
+
+    assert(false && "No available row state found");
+    return -1;
+  };
+
+  auto claimRowFn = [&](const Equation &equation,
+                        unsigned int threadId) -> std::optional<int64_t> {
+    std::lock_guard<std::mutex> lock(rowMutex);
+
+    assert(equation.indices.size() == 2);
+
+    if (row >= equation.indices[1].end) {
+      // No more available rows.
+      return std::nullopt;
+    }
+
+    size_t availableRow = findAvailableRowState();
+    threadToRowState[threadId] = availableRow;
+    rowInUse[availableRow] = true;
+
+    return row++;
+  };
+
+  for (auto &backwardEquation : multithreadedSchedule.backwardEquations) {
+    for (auto &rowState : rowStates) {
+      size_t numOfColumns = backwardEquation.getEquation().indices[1].end -
+                            backwardEquation.getEquation().indices[1].begin;
+      rowState.resize(numOfColumns);
+    }
+
+    for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
+      threadPool.async([&]() {
+        std::vector<char> *currentRowState =
+            &rowStates[threadToRowState[thread]];
+        std::vector<char> *previousRowState = nullptr;
+
+        if (lastAssignedRowState) {
+          previousRowState = &rowStates[*lastAssignedRowState];
+        }
+
+        backwardEquation.run(thread, claimRowFn, currentRowState,
+                             previousRowState);
+      });
+    }
+
+    row = 0;
   }
 
   threadPool.wait();
@@ -923,15 +1113,42 @@ RUNTIME_FUNC_DEF(schedulerDestroy, void, PTR(void))
 schedulerAddEquation_void(void *scheduler, void *equationFunction,
                           uint64_t rank, int64_t *ranges,
                           bool independentIndices) {
+  if (independentIndices) {
+    static_cast<Scheduler *>(scheduler)->addEquation(
+        reinterpret_cast<Scheduler::EquationFunction>(equationFunction), rank,
+        ranges, Scheduler::DependencyKind::IndependentIndices);
+  } else {
+    static_cast<Scheduler *>(scheduler)->addEquation(
+        reinterpret_cast<Scheduler::EquationFunction>(equationFunction), rank,
+        ranges, Scheduler::DependencyKind::Sequential);
+  }
+}
+
+[[maybe_unused]] static void schedulerAddEquation_void(void *scheduler,
+                                                       void *equationFunction,
+                                                       uint64_t rank,
+                                                       int64_t *ranges,
+                                                       int64_t dependencyKind) {
   assert(scheduler != nullptr);
+
+  Scheduler::DependencyKind dependency = Scheduler::DependencyKind::Sequential;
+
+  if (dependencyKind == 1) {
+    dependency = Scheduler::DependencyKind::Backward;
+  } else if (dependencyKind == 2) {
+    dependency = Scheduler::DependencyKind::IndependentIndices;
+  }
 
   static_cast<Scheduler *>(scheduler)->addEquation(
       reinterpret_cast<Scheduler::EquationFunction>(equationFunction), rank,
-      ranges, independentIndices);
+      ranges, dependency);
 }
 
 RUNTIME_FUNC_DEF(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
                  PTR(int64_t), bool)
+
+RUNTIME_FUNC_DEF(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
+                 PTR(int64_t), int64_t)
 
 //===---------------------------------------------------------------------===//
 // schedulerRun

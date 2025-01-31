@@ -7,7 +7,13 @@
 #include "marco/Runtime/Simulation/Options.h"
 #include "marco/Runtime/Support/Mangling.h"
 #include <cstdint>
+#include <variant>
 #include <vector>
+
+#ifdef THREADS_ENABLE
+#include <condition_variable>
+#include <mutex>
+#endif
 
 namespace marco::runtime {
 #ifdef MARCO_PROFILING
@@ -40,27 +46,67 @@ class Scheduler {
 public:
   using EquationFunction = void (*)(const int64_t *);
 
+  enum class DependencyKind { Sequential, Backward, IndependentIndices };
+
   struct Equation {
     EquationFunction function;
     MultidimensionalRange indices;
-    bool independentIndices;
+    DependencyKind dependencyKind;
 
     Equation(EquationFunction function, MultidimensionalRange indices,
-             bool independentIndices);
+             DependencyKind dependencyKind);
   };
 
   // An equation partition is composed of:
   //   - the equation descriptor.
   //   - the ranges information to be passed to the equation function.
-  using EquationPartition = std::pair<Equation, std::vector<int64_t>>;
+  class EquationPartition {
+    const Equation *equation;
+    std::vector<int64_t> ranges;
 
-  // A group of equation partitions.
-  using EquationsGroup = std::vector<EquationPartition>;
+    void run();
+  };
+
+  // A contiguous equation partition is composed of:
+  //   - the equation descriptor.
+  //   - the ranges information to be passed to the equation function.
+  using ContiguousEquationPartition = std::pair<Equation, std::vector<int64_t>>;
+
+  class BackwardEquation {
+  private:
+    const Equation *equation;
+
+  public:
+    explicit BackwardEquation(const Equation &equation);
+
+    const Equation &getEquation() const;
+
+    void
+    run(unsigned int threadId,
+        std::function<std::optional<int64_t>(const Equation &, unsigned int)>
+            claimRowFn,
+        std::vector<char> *previousRowState,
+        std::vector<char> *currentRowState);
+
+    MultidimensionalRange getRowBoundaries(int64_t row) const;
+
+    std::vector<int64_t> getBeginIndices(int64_t row) const;
+  };
+
+  using SequentialSchedule = std::vector<ContiguousEquationPartition>;
+
+  // A group of contiguous equation partitions.
+  using ContiguousEquationsGroup = std::vector<ContiguousEquationPartition>;
+
+  struct MultithreadedSchedule {
+    std::vector<ContiguousEquationsGroup> contiguousEquations;
+    std::vector<BackwardEquation> backwardEquations;
+  };
 
   Scheduler();
 
   void addEquation(EquationFunction function, uint64_t rank, int64_t *ranges,
-                   bool independentIndices);
+                   DependencyKind dependencyKind);
 
   void run();
 
@@ -69,10 +115,10 @@ private:
 
   [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
       const Equation &equation,
-      const std::vector<EquationsGroup> &schedule) const;
+      const std::vector<ContiguousEquationsGroup> &schedule) const;
 
   [[maybe_unused, nodiscard]] bool checkEquationIndicesExistence(
-      const EquationPartition &equationPartition) const;
+      const ContiguousEquationPartition &equationPartition) const;
 
   void runSequential();
 
@@ -90,12 +136,12 @@ private:
   // The list of equation partitions to be executed in case of sequential
   // execution policy.
   // The information is computed only once during the initialization.
-  std::vector<EquationPartition> sequentialSchedule;
+  SequentialSchedule sequentialSchedule;
 
   // The list of equations groups the threads will process. Each thread
   // processes one group at a time.
   // The information is computed only once during the initialization.
-  std::vector<EquationsGroup> multithreadedSchedule;
+  MultithreadedSchedule multithreadedSchedule;
 
   int64_t runsCounter{0};
   int64_t sequentialRunsMinTime{0};
@@ -119,6 +165,9 @@ RUNTIME_FUNC_DECL(schedulerDestroy, void, PTR(void))
 
 RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
                   PTR(int64_t), bool)
+
+RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
+                  PTR(int64_t), int64_t)
 
 RUNTIME_FUNC_DECL(schedulerRun, void, PTR(void))
 
