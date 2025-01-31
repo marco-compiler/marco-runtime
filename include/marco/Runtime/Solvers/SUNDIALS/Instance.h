@@ -141,21 +141,6 @@ namespace marco::runtime::sundials
       const VariableDimensions& dimensions,
       const std::vector<uint64_t>& end);
 
-  /// Given an array of indices and the dimensions of an equation, increase the
-  /// indices within the induction bounds of the equation. Return false if the
-  /// indices exceed the equation bounds, which means the computation has
-  /// finished, true otherwise.
-  bool advanceEquationIndices(
-      int64_t* indices, const MultidimensionalRange& ranges);
-
-  bool advanceEquationIndices(
-      std::vector<int64_t>& indices, const MultidimensionalRange& ranges);
-
-  bool advanceEquationIndicesUntil(
-      std::vector<int64_t>& indices,
-      const MultidimensionalRange& ranges,
-      const std::vector<int64_t>& end);
-
   /// Get the flat index corresponding to a multidimensional access.
   /// Example:
   ///   x[d1][d2][d3]

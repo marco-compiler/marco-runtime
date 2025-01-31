@@ -1,159 +1,204 @@
 #include "marco/Runtime/Modeling/MultidimensionalRange.h"
 #include <cassert>
 
-namespace marco::runtime
-{
-  MultidimensionalRangeIterator::MultidimensionalRangeIterator(const MultidimensionalRange& ranges, std::function<RangeIterator(const Range&)> initFunction)
-  {
-    for (const Range& range : ranges) {
-      beginIterators.push_back(RangeIterator::begin(range));
-      auto it = initFunction(range);
-      currentIterators.push_back(it);
-      endIterators.push_back(RangeIterator::end(range));
-      indices.push_back(*it);
-    }
-
-    assert(ranges.size() == beginIterators.size());
-    assert(ranges.size() == currentIterators.size());
-    assert(ranges.size() == endIterators.size());
-    assert(ranges.size() == indices.size());
+namespace marco::runtime {
+MultidimensionalRangeIterator::MultidimensionalRangeIterator(
+    const MultidimensionalRange &ranges,
+    std::function<RangeIterator(const Range &)> initFunction) {
+  for (const Range &range : ranges) {
+    beginIterators.push_back(RangeIterator::begin(range));
+    auto it = initFunction(range);
+    currentIterators.push_back(it);
+    endIterators.push_back(RangeIterator::end(range));
+    indices.push_back(*it);
   }
 
-  MultidimensionalRangeIterator MultidimensionalRangeIterator::begin(const MultidimensionalRange& ranges)
-  {
-    return MultidimensionalRangeIterator(ranges, [](const Range& range) {
-      return RangeIterator::begin(range);
-    });
-  }
+  assert(ranges.size() == beginIterators.size());
+  assert(ranges.size() == currentIterators.size());
+  assert(ranges.size() == endIterators.size());
+  assert(ranges.size() == indices.size());
+}
 
-  MultidimensionalRangeIterator MultidimensionalRangeIterator::end(const MultidimensionalRange& ranges)
-  {
-    return MultidimensionalRangeIterator(ranges, [](const Range& range) {
-      return RangeIterator::end(range);
-    });
-  }
+MultidimensionalRangeIterator
+MultidimensionalRangeIterator::begin(const MultidimensionalRange &ranges) {
+  return MultidimensionalRangeIterator(
+      ranges, [](const Range &range) { return RangeIterator::begin(range); });
+}
 
-  bool MultidimensionalRangeIterator::operator==(const MultidimensionalRangeIterator& it) const
-  {
-    return currentIterators == it.currentIterators;
-  }
+MultidimensionalRangeIterator
+MultidimensionalRangeIterator::end(const MultidimensionalRange &ranges) {
+  return MultidimensionalRangeIterator(
+      ranges, [](const Range &range) { return RangeIterator::end(range); });
+}
 
-  bool MultidimensionalRangeIterator::operator!=(const MultidimensionalRangeIterator& it) const
-  {
-    return currentIterators != it.currentIterators;
-  }
+bool MultidimensionalRangeIterator::operator==(
+    const MultidimensionalRangeIterator &it) const {
+  return currentIterators == it.currentIterators;
+}
 
-  MultidimensionalRangeIterator& MultidimensionalRangeIterator::operator++()
-  {
-    fetchNext();
-    return *this;
-  }
+bool MultidimensionalRangeIterator::operator!=(
+    const MultidimensionalRangeIterator &it) const {
+  return currentIterators != it.currentIterators;
+}
 
-  MultidimensionalRangeIterator MultidimensionalRangeIterator::operator++(int)
-  {
-    MultidimensionalRangeIterator temp = *this;
-    fetchNext();
-    return temp;
-  }
+MultidimensionalRangeIterator &MultidimensionalRangeIterator::operator++() {
+  fetchNext();
+  return *this;
+}
 
-  const int64_t* MultidimensionalRangeIterator::operator*() const
-  {
-    return indices.data();
-  }
+MultidimensionalRangeIterator MultidimensionalRangeIterator::operator++(int) {
+  MultidimensionalRangeIterator temp = *this;
+  fetchNext();
+  return temp;
+}
 
-  void MultidimensionalRangeIterator::fetchNext()
-  {
-    size_t size = indices.size();
+const int64_t *MultidimensionalRangeIterator::operator*() const {
+  return indices.data();
+}
 
-    auto findIndex = [&]() -> std::pair<bool, size_t> {
-      for (size_t i = 0, e = size; i < e; ++i) {
-        size_t pos = e - i - 1;
+void MultidimensionalRangeIterator::fetchNext() {
+  size_t size = indices.size();
 
-        if (++currentIterators[pos] != endIterators[pos]) {
-          return std::make_pair(true, pos);
-        }
-      }
+  auto findIndex = [&]() -> std::pair<bool, size_t> {
+    for (size_t i = 0, e = size; i < e; ++i) {
+      size_t pos = e - i - 1;
 
-      return std::make_pair(false, 0);
-    };
-
-    std::pair<bool, size_t> index = findIndex();
-
-    if (index.first) {
-      size_t pos = index.second;
-
-      indices[pos] = *currentIterators[pos];
-
-      for (size_t i = pos + 1; i < size; ++i) {
-        currentIterators[i] = beginIterators[i];
-        indices[i] = *currentIterators[i];
+      if (++currentIterators[pos] != endIterators[pos]) {
+        return std::make_pair(true, pos);
       }
     }
-  }
 
-  uint64_t getFlatSize(const MultidimensionalRange& ranges)
-  {
-    uint64_t result = 1;
+    return std::make_pair(false, 0);
+  };
 
-    for (const Range& range : ranges) {
-      result *= range.end - range.begin;
+  std::pair<bool, size_t> index = findIndex();
+
+  if (index.first) {
+    size_t pos = index.second;
+
+    indices[pos] = *currentIterators[pos];
+
+    for (size_t i = pos + 1; i < size; ++i) {
+      currentIterators[i] = beginIterators[i];
+      indices[i] = *currentIterators[i];
     }
-
-    return result;
-  }
-
-  uint64_t getFlatIndex(
-      const std::vector<int64_t>& indices,
-      const MultidimensionalRange& ranges)
-  {
-    assert(indices[0] >= ranges[0].begin);
-    uint64_t offset = indices[0] - ranges[0].begin;
-
-    for (size_t i = 1, e = ranges.size(); i < e; ++i) {
-      assert(ranges[i].end > ranges[i].begin);
-      offset = offset * (ranges[i].end - ranges[i].begin) +
-          (indices[i] - ranges[i].begin);
-    }
-
-    return offset;
-  }
-
-  void getIndicesFromFlatIndex(
-      uint64_t flatIndex,
-      std::vector<int64_t>& result,
-      const MultidimensionalRange& ranges)
-  {
-    result.resize(ranges.size());
-    uint64_t size = 1;
-
-    for (size_t i = 1, e = ranges.size(); i < e; ++i) {
-      assert(ranges[i].end > ranges[i].begin);
-      size *= ranges[i].end - ranges[i].begin;
-    }
-
-    for (size_t i = 1, e = ranges.size(); i < e; ++i) {
-      result[i - 1] =
-          static_cast<int64_t>(flatIndex / size) + ranges[i - 1].begin;
-
-      flatIndex %= size;
-      assert(ranges[i].end > ranges[i].begin);
-      size /= ranges[i].end - ranges[i].begin;
-    }
-
-    result[ranges.size() - 1] =
-        static_cast<int64_t>(flatIndex) + ranges.back().begin;
-
-    assert(size == 1);
-
-    assert(([&]() -> bool {
-             for (size_t i = 0, e = result.size(); i < e; ++i) {
-               if (result[i] < ranges[i].begin ||
-                   result[i] >= ranges[i].end) {
-                 return false;
-               }
-             }
-
-             return true;
-           }()) && "Wrong index unflattening result");
   }
 }
+
+uint64_t getFlatSize(const MultidimensionalRange &ranges) {
+  uint64_t result = 1;
+
+  for (const Range &range : ranges) {
+    result *= range.end - range.begin;
+  }
+
+  return result;
+}
+
+uint64_t getFlatIndex(const std::vector<int64_t> &indices,
+                      const MultidimensionalRange &ranges) {
+  assert(indices[0] >= ranges[0].begin);
+  uint64_t offset = indices[0] - ranges[0].begin;
+
+  for (size_t i = 1, e = ranges.size(); i < e; ++i) {
+    assert(ranges[i].end > ranges[i].begin);
+    offset = offset * (ranges[i].end - ranges[i].begin) +
+             (indices[i] - ranges[i].begin);
+  }
+
+  return offset;
+}
+
+void getIndicesFromFlatIndex(uint64_t flatIndex, std::vector<int64_t> &result,
+                             const MultidimensionalRange &ranges) {
+  result.resize(ranges.size());
+  uint64_t size = 1;
+
+  for (size_t i = 1, e = ranges.size(); i < e; ++i) {
+    assert(ranges[i].end > ranges[i].begin);
+    size *= ranges[i].end - ranges[i].begin;
+  }
+
+  for (size_t i = 1, e = ranges.size(); i < e; ++i) {
+    result[i - 1] =
+        static_cast<int64_t>(flatIndex / size) + ranges[i - 1].begin;
+
+    flatIndex %= size;
+    assert(ranges[i].end > ranges[i].begin);
+    size /= ranges[i].end - ranges[i].begin;
+  }
+
+  result[ranges.size() - 1] =
+      static_cast<int64_t>(flatIndex) + ranges.back().begin;
+
+  assert(size == 1);
+
+  assert(([&]() -> bool {
+           for (size_t i = 0, e = result.size(); i < e; ++i) {
+             if (result[i] < ranges[i].begin || result[i] >= ranges[i].end) {
+               return false;
+             }
+           }
+
+           return true;
+         }()) &&
+         "Wrong index unflattening result");
+}
+
+void getBeginIndices(std::vector<int64_t> &indices,
+                     const MultidimensionalRange &ranges) {
+  size_t rank = ranges.size();
+  indices.resize(rank);
+
+  for (size_t dim = 0; dim < rank; ++dim) {
+    indices[dim] = ranges[dim].begin;
+  }
+}
+
+void getEndIndices(std::vector<int64_t> &indices,
+                   const MultidimensionalRange &ranges) {
+  size_t rank = ranges.size();
+  indices.resize(rank);
+
+  for (size_t dim = 0; dim < rank; ++dim) {
+    indices[dim] = ranges[dim].end;
+  }
+}
+
+bool advanceEquationIndices(int64_t *indices,
+                            const MultidimensionalRange &ranges) {
+  for (size_t i = 0, e = ranges.size(); i < e; ++i) {
+    size_t pos = e - i - 1;
+    ++indices[pos];
+
+    if (indices[pos] == ranges[pos].end) {
+      indices[pos] = ranges[pos].begin;
+    } else {
+      return true;
+    }
+  }
+
+  for (size_t i = 0, e = ranges.size(); i < e; ++i) {
+    indices[i] = ranges[i].end;
+  }
+
+  return false;
+}
+
+bool advanceEquationIndices(std::vector<int64_t> &indices,
+                            const MultidimensionalRange &ranges) {
+  return advanceEquationIndices(indices.data(), ranges);
+}
+
+bool advanceEquationIndicesUntil(std::vector<int64_t> &indices,
+                                 const MultidimensionalRange &ranges,
+                                 const std::vector<int64_t> &end) {
+  assert(indices.size() == end.size());
+
+  if (!advanceEquationIndices(indices, ranges)) {
+    return false;
+  }
+
+  return indices != end;
+}
+} // namespace marco::runtime
