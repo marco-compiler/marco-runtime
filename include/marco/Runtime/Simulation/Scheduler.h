@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <variant>
 #include <vector>
+#include <atomic>
 
 #ifdef THREADS_ENABLE
 #include <condition_variable>
@@ -41,6 +42,72 @@ public:
   mutable std::mutex mutex;
 };
 #endif
+
+//===---------------------------------------------------------------------===//
+// ReadyState
+//===---------------------------------------------------------------------===//
+struct ReadyState
+{
+  explicit ReadyState() {
+    flag.store(false);
+  }
+
+
+  explicit ReadyState(bool flag) {
+        this->flag.store(flag);
+  }
+
+  ReadyState(const ReadyState &other) {
+    *this = other;
+    }
+  ReadyState(ReadyState &&other) {
+    *this = std::move(other);
+  }
+
+  ReadyState &operator=(const ReadyState &other) {
+        this->flag.store(other.flag.load());
+        return *this;
+  }
+
+  ReadyState &operator=(bool flag) {
+        this->flag.store(flag);
+        return *this;
+  }
+
+  ReadyState &operator=(ReadyState &&other) {
+        const bool val = other.flag.load();
+        this->flag.store(val);
+        other.flag.store(false);
+        return *this;
+  }
+
+  bool operator!=(bool other) {
+    return flag.load() != other;
+  }
+
+  bool operator==(bool other) {
+    return flag.load() == other;
+  }
+
+  bool isReady() {
+        return *this == true;
+  }
+
+  void setReady() {
+    flag.store(true);
+  }
+
+  void unsetReady() {
+    flag.store(false);
+  }
+
+  bool compareExchange(bool &expect, bool desired)
+  {
+        return flag.compare_exchange_weak(expect, desired);
+  }
+
+  std::atomic<bool> flag;
+};
 
 class Scheduler {
 public:
@@ -85,8 +152,8 @@ public:
     run(unsigned int threadId,
         std::function<std::optional<int64_t>(const Equation &, unsigned int)>
             claimRowFn,
-        std::vector<char> *previousRowState,
-        std::vector<char> *currentRowState);
+        std::vector<ReadyState> *previousRowState,
+        std::vector<ReadyState> *currentRowState);
 
     MultidimensionalRange getRowBoundaries(int64_t row) const;
 

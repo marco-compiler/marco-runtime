@@ -167,6 +167,8 @@ void SchedulerProfiler::print() const {
 
 #endif
 
+
+
 //===---------------------------------------------------------------------===//
 // EquationPartition
 //===---------------------------------------------------------------------===//
@@ -197,7 +199,7 @@ void Scheduler::BackwardEquation::run(
     unsigned int threadId,
     std::function<std::optional<int64_t>(const Equation &, unsigned int)>
         claimRowFn,
-    std::vector<char> *currentRowState, std::vector<char> *previousRowState) {
+    std::vector<ReadyState> *currentRowState, std::vector<ReadyState> *previousRowState) {
   std::optional<int64_t> row = claimRowFn(*equation, threadId);
 
   while (row) {
@@ -216,12 +218,7 @@ void Scheduler::BackwardEquation::run(
       int64_t column = indices[1];
 
       if (previousRowState) {
-        // Enforce volatile semantics so to avoid any compiler optimization on
-        // the readiness flag.
-        while (static_cast<volatile char>((*previousRowState)[column]) != 1) {
-          // Wait until the dependencies are satisfied.
-          // Synchronization is purposely not performed.
-          // Using chars guarantees consistency.
+        while ( ! (*previousRowState)[column].isReady() ) {
         }
       }
 
@@ -229,7 +226,7 @@ void Scheduler::BackwardEquation::run(
       equation->function(functionRanges.data());
 
       // Mark the cell as processed, so that other threads can continue.
-      static_cast<volatile char&>((*currentRowState)[column]) = 1;
+      (*currentRowState)[column].setReady();
     } while (advanceEquationIndices(indices, rowRange));
 
     // Move to the next row.
@@ -1002,7 +999,7 @@ void Scheduler::runMultithreaded() {
   int64_t row;
 
   // Keeps track of the satisfied dependencies.
-  std::vector<std::vector<char>> rowStates;
+  std::vector<std::vector<ReadyState>> rowStates;
   rowStates.resize(2 * numOfThreads);
 
   // Keeps track of which row state a thread is using.
@@ -1049,17 +1046,22 @@ void Scheduler::runMultithreaded() {
     for (auto &rowState : rowStates) {
       size_t numOfColumns = backwardEquation.getEquation().indices[1].end -
                             backwardEquation.getEquation().indices[1].begin;
-      rowState.resize(numOfColumns);
+
+            std::vector<ReadyState> theState;
+
+
+            rowState.clear();
+            rowState.resize(numOfColumns, ReadyState(false));
     }
 
     for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
       threadPool.async([&]() {
-        std::vector<char> *currentRowState =
+        std::vector<ReadyState> *currentRowState =
             &rowStates[threadToRowState[thread]];
 
-        std::fill(std::begin(*currentRowState), std::end(*currentRowState), 0);
+        std::fill(std::begin(*currentRowState), std::end(*currentRowState), false);
 
-        std::vector<char> *previousRowState = nullptr;
+        std::vector<ReadyState> *previousRowState = nullptr;
 
         if (lastAssignedRowState) {
           previousRowState = &rowStates[*lastAssignedRowState];
