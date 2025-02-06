@@ -216,7 +216,9 @@ void Scheduler::BackwardEquation::run(
       int64_t column = indices[1];
 
       if (previousRowState) {
-        while ((*previousRowState)[column] != 1) {
+        // Enforce volatile semantics so to avoid any compiler optimization on
+        // the readiness flag.
+        while (static_cast<volatile char>((*previousRowState)[column]) != 1) {
           // Wait until the dependencies are satisfied.
           // Synchronization is purposely not performed.
           // Using chars guarantees consistency.
