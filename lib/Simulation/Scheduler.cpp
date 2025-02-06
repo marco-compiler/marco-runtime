@@ -1056,6 +1056,9 @@ void Scheduler::runMultithreaded() {
       threadPool.async([&]() {
         std::vector<char> *currentRowState =
             &rowStates[threadToRowState[thread]];
+
+        std::fill(std::begin(*currentRowState), std::end(*currentRowState), 0);
+
         std::vector<char> *previousRowState = nullptr;
 
         if (lastAssignedRowState) {
