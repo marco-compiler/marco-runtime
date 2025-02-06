@@ -229,7 +229,7 @@ void Scheduler::BackwardEquation::run(
       equation->function(functionRanges.data());
 
       // Mark the cell as processed, so that other threads can continue.
-      (*currentRowState)[column] = 1;
+      static_cast<volatile char&>((*currentRowState)[column]) = 1;
     } while (advanceEquationIndices(indices, rowRange));
 
     // Move to the next row.
