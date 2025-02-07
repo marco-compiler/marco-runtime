@@ -1141,9 +1141,9 @@ schedulerAddEquation_void(void *scheduler, void *equationFunction,
   Scheduler::DependencyKind dependency = Scheduler::DependencyKind::Sequential;
 
   if (dependencyKind == 1) {
-    dependency = Scheduler::DependencyKind::Backward;
-  } else if (dependencyKind == 2) {
     dependency = Scheduler::DependencyKind::IndependentIndices;
+  } else if (dependencyKind == 2) {
+    dependency = Scheduler::DependencyKind::Backward;
   }
 
   static_cast<Scheduler *>(scheduler)->addEquation(
