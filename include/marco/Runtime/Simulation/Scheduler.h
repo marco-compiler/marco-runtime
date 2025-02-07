@@ -213,7 +213,7 @@ RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
                   PTR(int64_t), bool)
 
 RUNTIME_FUNC_DECL(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
-                  PTR(int64_t), int64_t)
+                  PTR(int64_t), uint32_t)
 
 RUNTIME_FUNC_DECL(schedulerRun, void, PTR(void))
 

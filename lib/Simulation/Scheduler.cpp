@@ -1134,7 +1134,7 @@ schedulerAddEquation_void(void *scheduler, void *equationFunction,
                                                        void *equationFunction,
                                                        uint64_t rank,
                                                        int64_t *ranges,
-                                                       int64_t dependencyKind) {
+                                                       uint32_t dependencyKind) {
   assert(scheduler != nullptr);
 
   Scheduler::DependencyKind dependency = Scheduler::DependencyKind::Sequential;
@@ -1154,7 +1154,7 @@ RUNTIME_FUNC_DEF(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
                  PTR(int64_t), bool)
 
 RUNTIME_FUNC_DEF(schedulerAddEquation, void, PTR(void), PTR(void), uint64_t,
-                 PTR(int64_t), int64_t)
+                 PTR(int64_t), uint32_t)
 
 //===---------------------------------------------------------------------===//
 // schedulerRun
