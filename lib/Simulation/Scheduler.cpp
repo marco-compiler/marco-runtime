@@ -167,8 +167,6 @@ void SchedulerProfiler::print() const {
 
 #endif
 
-
-
 //===---------------------------------------------------------------------===//
 // EquationPartition
 //===---------------------------------------------------------------------===//
@@ -199,7 +197,8 @@ void Scheduler::BackwardEquation::run(
     unsigned int threadId,
     std::function<std::optional<int64_t>(const Equation &, unsigned int)>
         claimRowFn,
-    std::vector<ReadyState> *currentRowState, std::vector<ReadyState> *previousRowState) {
+    std::vector<ReadyState> *currentRowState,
+    std::vector<ReadyState> *previousRowState) {
   std::optional<int64_t> row = claimRowFn(*equation, threadId);
 
   while (row) {
@@ -218,7 +217,7 @@ void Scheduler::BackwardEquation::run(
       int64_t column = indices[1];
 
       if (previousRowState) {
-        while ( ! (*previousRowState)[column].isReady() ) {
+        while (!(*previousRowState)[column].isReady()) {
         }
       }
 
@@ -1047,11 +1046,10 @@ void Scheduler::runMultithreaded() {
       size_t numOfColumns = backwardEquation.getEquation().indices[1].end -
                             backwardEquation.getEquation().indices[1].begin;
 
-            std::vector<ReadyState> theState;
+      std::vector<ReadyState> theState;
 
-
-            rowState.clear();
-            rowState.resize(numOfColumns, ReadyState(false));
+      rowState.clear();
+      rowState.resize(numOfColumns, ReadyState(false));
     }
 
     for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
@@ -1059,7 +1057,8 @@ void Scheduler::runMultithreaded() {
         std::vector<ReadyState> *currentRowState =
             &rowStates[threadToRowState[thread]];
 
-        std::fill(std::begin(*currentRowState), std::end(*currentRowState), false);
+        std::fill(std::begin(*currentRowState), std::end(*currentRowState),
+                  false);
 
         std::vector<ReadyState> *previousRowState = nullptr;
 

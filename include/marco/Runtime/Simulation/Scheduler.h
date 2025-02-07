@@ -6,10 +6,10 @@
 #include "marco/Runtime/Profiling/Timer.h"
 #include "marco/Runtime/Simulation/Options.h"
 #include "marco/Runtime/Support/Mangling.h"
+#include <atomic>
 #include <cstdint>
 #include <variant>
 #include <vector>
-#include <atomic>
 
 #ifdef THREADS_ENABLE
 #include <condition_variable>
@@ -46,64 +46,43 @@ public:
 //===---------------------------------------------------------------------===//
 // ReadyState
 //===---------------------------------------------------------------------===//
-struct ReadyState
-{
-  explicit ReadyState() {
-    flag.store(false);
-  }
+struct ReadyState {
+  explicit ReadyState() { flag.store(false); }
 
+  explicit ReadyState(bool flag) { this->flag.store(flag); }
 
-  explicit ReadyState(bool flag) {
-        this->flag.store(flag);
-  }
-
-  ReadyState(const ReadyState &other) {
-    *this = other;
-    }
-  ReadyState(ReadyState &&other) {
-    *this = std::move(other);
-  }
+  ReadyState(const ReadyState &other) { *this = other; }
+  ReadyState(ReadyState &&other) { *this = std::move(other); }
 
   ReadyState &operator=(const ReadyState &other) {
-        this->flag.store(other.flag.load());
-        return *this;
+    this->flag.store(other.flag.load());
+    return *this;
   }
 
   ReadyState &operator=(bool flag) {
-        this->flag.store(flag);
-        return *this;
+    this->flag.store(flag);
+    return *this;
   }
 
   ReadyState &operator=(ReadyState &&other) {
-        const bool val = other.flag.load();
-        this->flag.store(val);
-        other.flag.store(false);
-        return *this;
+    const bool val = other.flag.load();
+    this->flag.store(val);
+    other.flag.store(false);
+    return *this;
   }
 
-  bool operator!=(bool other) {
-    return flag.load() != other;
-  }
+  bool operator!=(bool other) { return flag.load() != other; }
 
-  bool operator==(bool other) {
-    return flag.load() == other;
-  }
+  bool operator==(bool other) { return flag.load() == other; }
 
-  bool isReady() {
-        return *this == true;
-  }
+  bool isReady() { return *this == true; }
 
-  void setReady() {
-    flag.store(true);
-  }
+  void setReady() { flag.store(true); }
 
-  void unsetReady() {
-    flag.store(false);
-  }
+  void unsetReady() { flag.store(false); }
 
-  bool compareExchange(bool &expect, bool desired)
-  {
-        return flag.compare_exchange_weak(expect, desired);
+  bool compareExchange(bool &expect, bool desired) {
+    return flag.compare_exchange_weak(expect, desired);
   }
 
   std::atomic<bool> flag;
