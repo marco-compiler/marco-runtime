@@ -1083,8 +1083,9 @@ void Scheduler::runMultithreaded() {
         std::vector<ReadyState> *currentRowState =
             &rowStates[threadToRowState[thread]];
 
-        std::fill(std::begin(*currentRowState), std::end(*currentRowState),
-                  false);
+        for (auto &readyState : *currentRowState) {
+          readyState.unsetReady();
+        }
 
         std::vector<ReadyState> *previousRowState = nullptr;
 
