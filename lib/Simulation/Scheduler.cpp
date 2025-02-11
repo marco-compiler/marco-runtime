@@ -485,7 +485,7 @@ void Scheduler::initialize() {
 
         std::cerr << std::endl;
         std::cerr << "  - Flat size: " << flatSize << std::endl;
-        std::cerr << "   - Dependency kind: ";
+        std::cerr << "  - Dependency kind: ";
 
         if (equation.dependencyKind == DependencyKind::Sequential) {
           std::cerr << "sequential";
