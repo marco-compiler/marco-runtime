@@ -761,8 +761,7 @@ void Scheduler::initialize() {
     assert(std::all_of(equations.begin(), equations.end(),
                        [&](const Equation &equation) {
                          return checkEquationScheduledExactlyOnce(
-                             equation,
-                             multithreadedSchedule.contiguousEquations);
+                             equation, multithreadedSchedule);
                        }) &&
            "Not all the equations are scheduled exactly once in the "
            "multithreaded schedule");
@@ -812,10 +811,25 @@ void Scheduler::initialize() {
 }
 
 bool Scheduler::checkEquationScheduledExactlyOnce(
+    const Equation &equation, const MultithreadedSchedule &schedule) const {
+  switch (equation.dependencyKind) {
+  case DependencyKind::Sequential:
+  case DependencyKind::IndependentIndices:
+    return checkEquationScheduledExactlyOnce(equation,
+                                             schedule.contiguousEquations);
+
+  case DependencyKind::Backward:
+    return checkEquationScheduledExactlyOnce(equation,
+                                             schedule.backwardEquations);
+  }
+
+  return false;
+}
+
+bool Scheduler::checkEquationScheduledExactlyOnce(
     const Equation &equation,
     const std::vector<ContiguousEquationsGroup> &schedule) const {
   auto beginIndicesIt = MultidimensionalRangeIterator::begin(equation.indices);
-
   auto endIndicesIt = MultidimensionalRangeIterator::end(equation.indices);
 
   size_t rank = equation.indices.size();
@@ -856,6 +870,18 @@ bool Scheduler::checkEquationScheduledExactlyOnce(
   }
 
   return true;
+}
+
+bool Scheduler::checkEquationScheduledExactlyOnce(
+    const Equation &equation,
+    const std::vector<BackwardEquation> &schedule) const {
+  for (const BackwardEquation& backwardEquation : schedule) {
+    if (backwardEquation.getEquation().function == equation.function) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool Scheduler::checkEquationIndicesExistence(

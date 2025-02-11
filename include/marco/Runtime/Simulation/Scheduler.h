@@ -160,8 +160,15 @@ private:
   void initialize();
 
   [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
+      const Equation &equation, const MultithreadedSchedule &schedule) const;
+
+  [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
       const Equation &equation,
       const std::vector<ContiguousEquationsGroup> &schedule) const;
+
+  [[maybe_unused, nodiscard]] bool checkEquationScheduledExactlyOnce(
+      const Equation &equation,
+      const std::vector<BackwardEquation> &schedule) const;
 
   [[maybe_unused, nodiscard]] bool checkEquationIndicesExistence(
       const ContiguousEquationPartition &equationPartition) const;
