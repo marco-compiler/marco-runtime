@@ -1157,11 +1157,10 @@ schedulerAddEquation_void(void *scheduler, void *equationFunction,
   }
 }
 
-[[maybe_unused]] static void schedulerAddEquation_void(void *scheduler,
-                                                       void *equationFunction,
-                                                       uint64_t rank,
-                                                       int64_t *ranges,
-                                                       uint32_t dependencyKind) {
+[[maybe_unused]] static void
+schedulerAddEquation_void(void *scheduler, void *equationFunction,
+                          uint64_t rank, int64_t *ranges,
+                          uint32_t dependencyKind) {
   assert(scheduler != nullptr);
 
   Scheduler::DependencyKind dependency = Scheduler::DependencyKind::Sequential;
