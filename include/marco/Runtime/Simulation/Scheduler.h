@@ -81,7 +81,7 @@ struct ReadyState {
 
   void unsetReady() { flag.store(false); }
 
-  bool compareExchange(bool &expect, bool desired) {
+  bool compareExchange(bool expect, bool desired) {
     return flag.compare_exchange_weak(expect, desired);
   }
 
@@ -122,21 +122,52 @@ public:
   private:
     const Equation *equation;
 
+    // Keeps track of the satisfied dependencies.
+    std::vector<std::vector<ReadyState>> readyStates;
+
+    // Keeps track of whether a row is being used by a thread.
+    std::vector<ReadyState> rowInUse;
+
+    // The next row to be computed.
+    std::mutex rowMutex;
+    int64_t nextRow{0};
+
+    // The identifier of the last assigned ready state row.
+    std::optional<size_t> lastAssignedRowState{std::nullopt};
+
+    struct Job {
+      int64_t row;
+      size_t currentRowState;
+      std::optional<size_t> previousRowState;
+    };
+
   public:
-    explicit BackwardEquation(const Equation &equation);
+    explicit BackwardEquation(const Equation &equation, uint64_t numOfThreads);
+
+    BackwardEquation(const BackwardEquation &other) = delete;
+
+    BackwardEquation(BackwardEquation &&other);
+
+    ~BackwardEquation();
+
+    BackwardEquation &operator=(const BackwardEquation &other) = delete;
+
+    BackwardEquation &operator=(BackwardEquation &&other);
 
     const Equation &getEquation() const;
 
-    void
-    run(unsigned int threadId,
-        std::function<std::optional<int64_t>(const Equation &, unsigned int)>
-            claimRowFn,
-        std::vector<ReadyState> *previousRowState,
-        std::vector<ReadyState> *currentRowState);
+    void run();
 
+    void reset();
+
+  private:
     MultidimensionalRange getRowBoundaries(int64_t row) const;
 
     std::vector<int64_t> getBeginIndices(int64_t row) const;
+
+    std::optional<Job> claimJob();
+
+    size_t getAvailableRowState();
   };
 
   using SequentialSchedule = std::vector<ContiguousEquationPartition>;
