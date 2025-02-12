@@ -71,11 +71,11 @@ struct ReadyState {
     return *this;
   }
 
-  bool operator!=(bool other) { return flag.load() != other; }
+  bool operator!=(bool other) const { return flag.load() != other; }
 
-  bool operator==(bool other) { return flag.load() == other; }
+  bool operator==(bool other) const { return flag.load() == other; }
 
-  bool isReady() { return *this == true; }
+  bool isReady() const { return *this == true; }
 
   void setReady() { flag.store(true); }
 
