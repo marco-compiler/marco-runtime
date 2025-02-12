@@ -185,39 +185,75 @@ void Scheduler::EquationPartition::run() {
 namespace marco::runtime {
 
 Scheduler::BackwardEquation::BackwardEquation(
-    const Scheduler::Equation &equation)
-    : equation(&equation) {}
+    const Scheduler::Equation &equation, uint64_t numOfThreads)
+    : equation(&equation) {
+  readyStates.resize(2 * numOfThreads);
+  size_t numOfColumns = equation.indices[1].end - equation.indices[1].begin;
+
+  for (auto &readyState : readyStates) {
+    readyState.resize(numOfColumns, ReadyState(false));
+  }
+
+  rowInUse.resize(2 * numOfThreads, ReadyState(false));
+}
+
+Scheduler::BackwardEquation::BackwardEquation(BackwardEquation &&other) {
+  std::unique_lock<std::mutex> lock(other.rowMutex);
+  equation = other.equation;
+  readyStates = std::move(other.readyStates);
+  rowInUse = std::move(other.rowInUse);
+  nextRow = other.nextRow;
+  lastAssignedRowState = other.lastAssignedRowState;
+}
+
+Scheduler::BackwardEquation::~BackwardEquation() = default;
+
+Scheduler::BackwardEquation &
+Scheduler::BackwardEquation::operator=(BackwardEquation &&other) {
+  if (this != &other) {
+    std::unique_lock<std::mutex> lhsLock(rowMutex);
+    std::unique_lock<std::mutex> rhsLock(other.rowMutex);
+
+    equation = other.equation;
+    readyStates = std::move(other.readyStates);
+    rowInUse = std::move(other.rowInUse);
+    nextRow = other.nextRow;
+    lastAssignedRowState = other.lastAssignedRowState;
+  }
+
+  return *this;
+}
 
 const Scheduler::Equation &Scheduler::BackwardEquation::getEquation() const {
   assert(equation != nullptr);
   return *equation;
 }
 
-void Scheduler::BackwardEquation::run(
-    unsigned int threadId,
-    std::function<std::optional<int64_t>(const Equation &, unsigned int)>
-        claimRowFn,
-    std::vector<ReadyState> *currentRowState,
-    std::vector<ReadyState> *previousRowState) {
-  std::optional<int64_t> row = claimRowFn(*equation, threadId);
+void Scheduler::BackwardEquation::run() {
+  std::optional<Job> job = claimJob();
 
-  while (row) {
-    MultidimensionalRange rowRange = getRowBoundaries(*row);
-    std::vector<int64_t> indices = getBeginIndices(*row);
+  while (job) {
+    MultidimensionalRange rowRange = getRowBoundaries(job->row);
+    std::vector<int64_t> indices = getBeginIndices(job->row);
+    size_t rank = indices.size();
+
     std::vector<int64_t> functionRanges;
-    functionRanges.resize(indices.size() * 2, 0xDEADF00D);
+    functionRanges.resize(rank * 2, 0xDEADBEEF);
 
     do {
       // Compute the iteration boundaries that the equation function will use.
-      for (size_t dim = 0, rank = indices.size(); dim < rank; ++dim) {
+      for (size_t dim = 0; dim < rank; ++dim) {
         functionRanges[dim * 2] = indices[dim];
         functionRanges[dim * 2 + 1] = indices[dim] + 1;
       }
 
       int64_t column = indices[1];
 
-      if (previousRowState) {
-        while (!(*previousRowState)[column].isReady()) {
+      if (job->previousRowState) {
+        while (!readyStates[*job->previousRowState][column].isReady()) {
+          // Intentionally spin-wait until the dependencies are satisfied.
+          // Locking a mutex is expensive, and the waiting time tends to zero as
+          // the iteration space is progressively visited.
         }
       }
 
@@ -225,12 +261,31 @@ void Scheduler::BackwardEquation::run(
       equation->function(functionRanges.data());
 
       // Mark the cell as processed, so that other threads can continue.
-      (*currentRowState)[column].setReady();
+      readyStates[job->currentRowState][column].setReady();
     } while (advanceEquationIndices(indices, rowRange));
 
     // Move to the next row.
-    row = claimRowFn(*equation, threadId);
+    if (job->previousRowState) {
+      rowInUse[*job->previousRowState] = false;
+    }
+
+    job = claimJob();
   }
+}
+
+void Scheduler::BackwardEquation::reset() {
+  for (auto &readyStateRow : readyStates) {
+    for (auto &readyState : readyStateRow) {
+      readyState.unsetReady();
+    }
+  }
+
+  for (size_t i = 0, e = rowInUse.size(); i < e; ++i) {
+    rowInUse[i] = false;
+  }
+
+  nextRow = 0;
+  lastAssignedRowState = std::nullopt;
 }
 
 MultidimensionalRange
@@ -252,6 +307,38 @@ Scheduler::BackwardEquation::getBeginIndices(int64_t row) const {
   ranges.push_back(equation->indices[1].begin);
 
   return ranges;
+}
+
+std::optional<Scheduler::BackwardEquation::Job>
+Scheduler::BackwardEquation::claimJob() {
+  std::lock_guard<std::mutex> lock(rowMutex);
+  assert(equation->indices.size() == 2);
+
+  if (nextRow + equation->indices[0].begin >= equation->indices[0].end) {
+    // No more available rows.
+    return std::nullopt;
+  }
+
+  size_t availableRow = getAvailableRowState();
+
+  std::optional<size_t> previousReadyState = lastAssignedRowState;
+  lastAssignedRowState = availableRow;
+
+  for (auto &readyState : readyStates[availableRow]) {
+    readyState = false;
+  }
+
+  return Job{nextRow++, availableRow, previousReadyState};
+}
+
+size_t Scheduler::BackwardEquation::getAvailableRowState() {
+  while (true) {
+    for (size_t i = 0, e = rowInUse.size(); i < e; ++i) {
+      if (rowInUse[i].compareExchange(false, true)) {
+        return i;
+      }
+    }
+  }
 }
 } // namespace marco::runtime
 
@@ -707,7 +794,8 @@ void Scheduler::initialize() {
           }
         }
       } else if (equation.dependencyKind == DependencyKind::Backward) {
-        multithreadedSchedule.backwardEquations.emplace_back(equation);
+        multithreadedSchedule.backwardEquations.emplace_back(equation,
+                                                             numOfThreads);
       } else {
         // All the indices must be visited by a single thread.
         std::vector<int64_t> ranges;
@@ -875,7 +963,7 @@ bool Scheduler::checkEquationScheduledExactlyOnce(
 bool Scheduler::checkEquationScheduledExactlyOnce(
     const Equation &equation,
     const std::vector<BackwardEquation> &schedule) const {
-  for (const BackwardEquation& backwardEquation : schedule) {
+  for (const BackwardEquation &backwardEquation : schedule) {
     if (backwardEquation.getEquation().function == equation.function) {
       return true;
     }
@@ -992,7 +1080,7 @@ void Scheduler::runMultithreaded() {
   ThreadPool &threadPool = getSchedulersThreadPool();
   unsigned int numOfThreads = threadPool.getNumOfThreads();
 
-  // Run contiguous equations.
+  // Run the contiguous equations.
   std::atomic_size_t equationsGroupIndex = 0;
 
   for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
@@ -1019,89 +1107,15 @@ void Scheduler::runMultithreaded() {
 
   threadPool.wait();
 
-  // Run backward equations.
-  std::mutex rowMutex;
-  int64_t row;
-
-  // Keeps track of the satisfied dependencies.
-  std::vector<std::vector<ReadyState>> rowStates;
-  rowStates.resize(2 * numOfThreads);
-
-  // Keeps track of which row state a thread is using.
-  std::vector<int64_t> threadToRowState;
-  threadToRowState.resize(numOfThreads, -1);
-
-  // Keeps track of whether a row is being used by a thread.
-  std::vector<bool> rowInUse;
-  rowInUse.resize(2 * numOfThreads, false);
-
-  // The identifier of the last assigned row state.
-  std::optional<size_t> lastAssignedRowState = std::nullopt;
-
-  auto findAvailableRowState = [&]() -> size_t {
-    for (size_t i = 0, e = rowInUse.size(); i < e; ++i) {
-      if (!rowInUse[i]) {
-        return i;
-      }
-    }
-
-    assert(false && "No available row state found");
-    return -1;
-  };
-
-  auto claimRowFn = [&](const Equation &equation,
-                        unsigned int threadId) -> std::optional<int64_t> {
-    std::lock_guard<std::mutex> lock(rowMutex);
-
-    assert(equation.indices.size() == 2);
-
-    if (row >= equation.indices[1].end) {
-      // No more available rows.
-      return std::nullopt;
-    }
-
-    size_t availableRow = findAvailableRowState();
-    threadToRowState[threadId] = availableRow;
-    rowInUse[availableRow] = true;
-
-    return row++;
-  };
-
+  // Run the backward equations.
   for (auto &backwardEquation : multithreadedSchedule.backwardEquations) {
-    for (auto &rowState : rowStates) {
-      size_t numOfColumns = backwardEquation.getEquation().indices[1].end -
-                            backwardEquation.getEquation().indices[1].begin;
-
-      std::vector<ReadyState> theState;
-
-      rowState.clear();
-      rowState.resize(numOfColumns, ReadyState(false));
-    }
-
     for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
-      threadPool.async([&]() {
-        std::vector<ReadyState> *currentRowState =
-            &rowStates[threadToRowState[thread]];
-
-        for (auto &readyState : *currentRowState) {
-          readyState.unsetReady();
-        }
-
-        std::vector<ReadyState> *previousRowState = nullptr;
-
-        if (lastAssignedRowState) {
-          previousRowState = &rowStates[*lastAssignedRowState];
-        }
-
-        backwardEquation.run(thread, claimRowFn, currentRowState,
-                             previousRowState);
-      });
+      threadPool.async([&]() { backwardEquation.run(); });
     }
 
-    row = 0;
+    threadPool.wait();
+    backwardEquation.reset();
   }
-
-  threadPool.wait();
 }
 
 void Scheduler::runMultithreadedWithCalibration() {
