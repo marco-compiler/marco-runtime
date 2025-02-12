@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <optional>
 
@@ -275,9 +276,7 @@ void Scheduler::BackwardEquation::run() {
 
 void Scheduler::BackwardEquation::reset() {
   for (auto &readyStateRow : readyStates) {
-    for (auto &readyState : readyStateRow) {
-      readyState.unsetReady();
-    }
+    std::memset(readyStateRow.data(), false, readyStateRow.size());
   }
 
   for (size_t i = 0, e = rowInUse.size(); i < e; ++i) {
@@ -324,9 +323,7 @@ Scheduler::BackwardEquation::claimJob() {
   std::optional<size_t> previousReadyState = lastAssignedRowState;
   lastAssignedRowState = availableRow;
 
-  for (auto &readyState : readyStates[availableRow]) {
-    readyState = false;
-  }
+  std::memset(readyStates[availableRow].data(), false, readyStates[availableRow].size());
 
   return Job{nextRow++, availableRow, previousReadyState};
 }
