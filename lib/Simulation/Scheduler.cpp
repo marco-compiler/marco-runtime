@@ -390,7 +390,17 @@ void Scheduler::BackwardEquation::run(unsigned int threadId) {
       // Compute the iteration boundaries that the equation function will use.
       for (size_t dim = 0; dim < rank; ++dim) {
         functionRanges[dim * 2] = indices[dim];
-        functionRanges[dim * 2 + 1] = indices[dim] + 1;
+        functionRanges[dim * 2 + 1] = indices[dim];
+
+        if (dim + 1 == rank) {
+          functionRanges[dim * 2 + 1] += 64;
+        } else {
+          functionRanges[dim * 2 + 1] += 1;
+        }
+
+        if (functionRanges[dim * 2 + 1] > rowRange[rank - 1].end) {
+          functionRanges[dim * 2 + 1] = rowRange[rank - 1].end;
+        }
       }
 
       int64_t column = indices[1];
@@ -412,8 +422,14 @@ void Scheduler::BackwardEquation::run(unsigned int threadId) {
       equation->function(functionRanges.data());
       SCHEDULER_PROFILER_MT_BACKWARD_FUNC_STOP(threadId)
 
-      // Mark the cell as processed, so that other threads can continue.
-      readyStates[job->currentRowState][column].setReady();
+      // Mark the cells as processed, so that other threads can continue.
+      for (int64_t i = column,
+                   e = std::min(column + 64, rowRange[rank - 1].end);
+           i < e; ++i) {
+        readyStates[job->currentRowState][i] = true;
+      }
+
+      indices[rank - 1] = functionRanges[(rank - 1) * 2 + 1] - 1;
     } while (advanceEquationIndices(indices, rowRange));
 
     // Move to the next row.
