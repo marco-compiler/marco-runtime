@@ -22,10 +22,6 @@ class SchedulerProfiler : public profiling::Profiler {
 public:
   SchedulerProfiler(int64_t schedulerId);
 
-  void createPartitionsGroupsCounters(size_t amount);
-
-  void createPartitionsGroupsTimers(size_t amount);
-
   void reset() override;
 
   void print() const override;
@@ -34,12 +30,52 @@ public:
   profiling::Timer addEquation;
   profiling::Timer initialization;
   profiling::Timer run;
-  int64_t sequentialRuns{0};
-  int64_t multithreadedRuns{0};
-  std::vector<int64_t> partitionsGroupsCounters;
-  std::vector<std::unique_ptr<profiling::Timer>> partitionsGroups;
 
-  mutable std::mutex mutex;
+  struct SequentialScheduleProfiling {
+    int64_t executions{0};
+
+    void reset();
+    void print() const;
+  };
+
+  struct MultithreadedScheduleProfiling {
+    struct ContiguousEquationsGroupsProfiling {
+      /// The number of times the thread picks up a group of contiguous
+      /// equations.
+      int64_t groupsCounter{0};
+
+      /// The time spent in processing contiguous equations.
+      std::unique_ptr<profiling::Timer> timer;
+
+      void reset();
+    };
+
+    struct BackwardEquationProfiling {
+      /// The number of times the thread picks up a row of the backward
+      /// equation.
+      int64_t rowCounter{0};
+
+      /// The time spent in the equation functions.
+      std::unique_ptr<profiling::Timer> equationFunction;
+
+      /// The time spent waiting for the dependencies to be satisfied.
+      std::unique_ptr<profiling::Timer> dependencyWaiting;
+
+      void reset();
+    };
+
+    int64_t executions{0};
+    std::vector<ContiguousEquationsGroupsProfiling> contiguousEquations;
+    std::vector<BackwardEquationProfiling> backwardEquations;
+
+    void reset();
+    void print() const;
+
+    void setNumOfThreads(uint64_t numOfThreads);
+  };
+
+  SequentialScheduleProfiling sequentialSchedule;
+  MultithreadedScheduleProfiling multithreadedSchedule;
 };
 #endif
 
@@ -121,6 +157,7 @@ public:
   class BackwardEquation {
   private:
     const Equation *equation;
+    SchedulerProfiler *profiler;
 
     // Keeps track of the satisfied dependencies.
     std::vector<std::vector<ReadyState>> readyStates;
@@ -142,7 +179,8 @@ public:
     };
 
   public:
-    explicit BackwardEquation(const Equation &equation, uint64_t numOfThreads);
+    BackwardEquation(const Equation &equation, uint64_t numOfThreads,
+                     SchedulerProfiler *profiler = nullptr);
 
     BackwardEquation(const BackwardEquation &other) = delete;
 
@@ -156,7 +194,7 @@ public:
 
     const Equation &getEquation() const;
 
-    void run();
+    void run(unsigned int threadId);
 
     void reset();
 

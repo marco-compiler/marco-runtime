@@ -21,130 +21,265 @@ using namespace ::marco::runtime;
 SchedulerProfiler::SchedulerProfiler(int64_t schedulerId)
     : Profiler("Scheduler " + std::to_string(schedulerId)) {}
 
-void SchedulerProfiler::createPartitionsGroupsCounters(size_t amount) {
-  partitionsGroupsCounters.clear();
-  partitionsGroupsCounters.resize(amount, 0);
-}
-
-void SchedulerProfiler::createPartitionsGroupsTimers(size_t amount) {
-  partitionsGroups.clear();
-
-  for (size_t i = 0; i < amount; ++i) {
-    partitionsGroups.push_back(std::make_unique<profiling::Timer>());
-  }
-}
-
 void SchedulerProfiler::reset() {
-  std::lock_guard<std::mutex> lockGuard(mutex);
-
   addEquation.reset();
   initialization.reset();
   run.reset();
-  sequentialRuns = 0;
-  multithreadedRuns = 0;
+  sequentialSchedule.reset();
+  multithreadedSchedule.reset();
+}
 
-  for (auto &partitionsGroup : partitionsGroups) {
-    partitionsGroup->reset();
+void SchedulerProfiler::SequentialScheduleProfiling::reset() { executions = 0; }
+
+void SchedulerProfiler::MultithreadedScheduleProfiling::reset() {
+  executions = 0;
+
+  for (auto &profiling : contiguousEquations) {
+    profiling.reset();
+  }
+
+  for (auto &profiling : backwardEquations) {
+    profiling.reset();
+  }
+}
+
+void SchedulerProfiler::MultithreadedScheduleProfiling::
+    ContiguousEquationsGroupsProfiling::reset() {
+  groupsCounter = 0;
+  timer->reset();
+}
+
+void SchedulerProfiler::MultithreadedScheduleProfiling::
+    BackwardEquationProfiling::reset() {
+  equationFunction->reset();
+  dependencyWaiting->reset();
+}
+
+void SchedulerProfiler::MultithreadedScheduleProfiling::setNumOfThreads(
+    uint64_t numOfThreads) {
+  contiguousEquations.clear();
+  backwardEquations.clear();
+
+  for (size_t i = 0; i < numOfThreads; ++i) {
+    contiguousEquations.emplace_back(ContiguousEquationsGroupsProfiling{
+        0, std::make_unique<profiling::Timer>()});
+
+    backwardEquations.emplace_back(
+        BackwardEquationProfiling{0, std::make_unique<profiling::Timer>(),
+                                  std::make_unique<profiling::Timer>()});
   }
 }
 
 void SchedulerProfiler::print() const {
-  std::lock_guard<std::mutex> lockGuard(mutex);
-
   std::cerr << "Time spent on adding the equations: "
-            << addEquation.totalElapsedTime<std::milli>() << " ms" << std::endl;
+            << addEquation.totalElapsedTime<std::milli>() << " ms\n";
 
   std::cerr << "Time spent on initialization: "
-            << initialization.totalElapsedTime<std::milli>() << " ms"
-            << std::endl;
+            << initialization.totalElapsedTime<std::milli>() << " ms\n";
 
   std::cerr << "Time spent on 'run' method: "
-            << run.totalElapsedTime<std::milli>() << " ms" << std::endl;
+            << run.totalElapsedTime<std::milli>() << " ms\n";
 
-  std::cerr << "Number of sequential executions: " << sequentialRuns
-            << std::endl;
+  if (sequentialSchedule.executions != 0) {
+    std::cerr << "\n";
+    sequentialSchedule.print();
+  }
 
-  std::cerr << "Number of multithreaded executions: " << multithreadedRuns
-            << std::endl;
+  if (multithreadedSchedule.executions != 0) {
+    std::cerr << "\n";
+    multithreadedSchedule.print();
+  }
+}
 
-  for (size_t i = 0, e = partitionsGroups.size(); i < e; ++i) {
-    auto partitionsGroupsCounter = partitionsGroupsCounters[i];
+void SchedulerProfiler::SequentialScheduleProfiling::print() const {
+  std::cerr << "Sequential schedule:\n";
+  std::cerr << "  - Number of executions: " << executions << "\n";
+}
 
-    double averagePartitionsGroupTime =
-        partitionsGroups[i]->totalElapsedTime<std::nano>() /
-        static_cast<double>(partitionsGroupsCounter);
+void SchedulerProfiler::MultithreadedScheduleProfiling::print() const {
+  std::cerr << "Multithreaded schedule:\n";
+  std::cerr << "  - Number of executions: " << executions << "\n\n";
+
+  std::cerr << "  - Contiguous equation groups:\n";
+
+  for (size_t threadId = 0, e = contiguousEquations.size(); threadId < e;
+       ++threadId) {
+    auto contiguousGroupsCounter = contiguousEquations[threadId].groupsCounter;
+
+    double averageContiguousGroupTime = 0;
+
+    if (contiguousGroupsCounter != 0) {
+      averageContiguousGroupTime =
+          contiguousEquations[threadId].timer->totalElapsedTime<std::nano>() /
+          static_cast<double>(contiguousGroupsCounter);
+    }
+
+    std::cerr << "    - Thread " << threadId << "\n";
+
+    std::cerr
+        << "      "
+        << "Total time spent processing contiguous equations: "
+        << contiguousEquations[threadId].timer->totalElapsedTime<std::milli>()
+        << " ms\n";
+
+    std::cerr << "      "
+              << "Average time spent processing contiguous equation groups: "
+              << averageContiguousGroupTime << " ns\n";
+
+    std::cerr << "      "
+              << "Number of contiguous equation groups processed: "
+              << contiguousGroupsCounter << "\n";
 
     std::cerr << "\n";
+  }
 
-    std::cerr << "Time (total) spent by thread #" << i
-              << " in processing equations: "
-              << partitionsGroups[i]->totalElapsedTime<std::milli>() << " ms"
-              << std::endl;
+  std::cerr << "  - Backward equations:\n";
 
-    std::cerr << "Time (average) spent by thread #" << i
-              << " in processing equations: " << averagePartitionsGroupTime
-              << " ns" << std::endl;
+  for (size_t threadId = 0, e = contiguousEquations.size(); threadId < e;
+       ++threadId) {
+    std::cerr << "    - Thread " << threadId << "\n";
 
-    std::cerr << "Number of partitions groups processed: "
-              << partitionsGroupsCounter << std::endl;
+    auto rowCounter = backwardEquations[threadId].rowCounter;
+    std::cerr << "      " << "Number of rows processed: " << rowCounter << "\n";
+
+    std::cerr << "      "
+              << "Total time spent executing equation functions: "
+              << backwardEquations[threadId]
+                     .equationFunction->totalElapsedTime<std::milli>()
+              << " ms\n";
+
+    double averageEquationFunctionRowTime = 0;
+
+    if (rowCounter != 0) {
+      averageEquationFunctionRowTime =
+          backwardEquations[threadId]
+              .equationFunction->totalElapsedTime<std::nano>() /
+          static_cast<double>(rowCounter);
+    }
+
+    std::cerr << "      "
+              << "Average time per row spent executing equation functions: "
+              << averageEquationFunctionRowTime << " ns\n";
+
+    std::cerr << "      "
+              << "Total time spent waiting for dependencies: "
+              << backwardEquations[threadId]
+                     .dependencyWaiting->totalElapsedTime<std::milli>()
+              << " ms\n";
+
+    double averageWaitRowTime = 0;
+
+    if (rowCounter != 0) {
+      averageWaitRowTime =
+          backwardEquations[threadId]
+              .dependencyWaiting->totalElapsedTime<std::nano>() /
+          static_cast<double>(rowCounter);
+    }
+
+    std::cerr << "      "
+              << "Average time per row spent waiting for dependencies: "
+              << averageWaitRowTime << " ns\n";
+
+    std::cerr << "\n";
   }
 }
 
 // clang-format off
 #define SCHEDULER_PROFILER_ADD_EQUATION_START                                 \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->addEquation.start();                                            \
   }
 
 #define SCHEDULER_PROFILER_ADD_EQUATION_STOP                                  \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->addEquation.stop();                                             \
   }
 
 #define SCHEDULER_PROFILER_RUN_START                                          \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->run.start();                                                    \
   }
 
 #define SCHEDULER_PROFILER_RUN_STOP                                           \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->run.stop();                                                     \
-  }
-
-#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER                  \
-  if (::marco::runtime::simulation::getOptions().profiling) {                 \
-    ++profiler->sequentialRuns;                                               \
-  }
-
-#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_RUNS_COUNTER               \
-  if (::marco::runtime::simulation::getOptions().profiling) {                 \
-    ++profiler->multithreadedRuns;                                            \
   }
 
 #define SCHEDULER_PROFILER_INITIALIZATION_START                               \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->initialization.start();                                         \
   }
 
 #define SCHEDULER_PROFILER_INITIALIZATION_STOP                                \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
     profiler->initialization.stop();                                          \
   }
 
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread)                     \
+#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_EXECUTIONS_COUNTER            \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
-    profiler->partitionsGroups[thread]->start();                              \
-    profiler->partitionsGroupsCounters[thread]++;                             \
+    assert(profiler != nullptr);                                              \
+    ++profiler->sequentialSchedule.executions;                                \
   }
 
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread)                      \
+#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_EXECUTIONS_COUNTER         \
   if (::marco::runtime::simulation::getOptions().profiling) {                 \
-    profiler->partitionsGroups[thread]->stop();                               \
+    assert(profiler != nullptr);                                              \
+    ++profiler->multithreadedSchedule.executions;                             \
+  }
+
+#define SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_START(thread)                     \
+  if (::marco::runtime::simulation::getOptions().profiling) {                    \
+    assert(profiler != nullptr);                                                 \
+    ++profiler->multithreadedSchedule.contiguousEquations[thread].groupsCounter; \
+    profiler->multithreadedSchedule.contiguousEquations[thread].timer->start();  \
+  }
+
+#define SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_STOP(thread)                    \
+  if (::marco::runtime::simulation::getOptions().profiling) {                  \
+    assert(profiler != nullptr);                                               \
+    profiler->multithreadedSchedule.contiguousEquations[thread].timer->stop(); \
+  }
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_ROW_INCREMENT(thread)                  \
+  if (::marco::runtime::simulation::getOptions().profiling) {                 \
+    assert(profiler != nullptr);                                              \
+    ++profiler->multithreadedSchedule.backwardEquations[thread].rowCounter;   \
+  }
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_FUNC_START(thread)                                \
+  if (::marco::runtime::simulation::getOptions().profiling) {                            \
+    assert(profiler != nullptr);                                                         \
+    profiler->multithreadedSchedule.backwardEquations[thread].equationFunction->start(); \
+  }
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_FUNC_STOP(thread)                                \
+  if (::marco::runtime::simulation::getOptions().profiling) {                           \
+    assert(profiler != nullptr);                                                        \
+    profiler->multithreadedSchedule.backwardEquations[thread].equationFunction->stop(); \
+  }
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_START(thread)                           \
+  if (::marco::runtime::simulation::getOptions().profiling) {                             \
+    assert(profiler != nullptr);                                                          \
+    profiler->multithreadedSchedule.backwardEquations[thread].dependencyWaiting->start(); \
+  }
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_STOP(thread)                           \
+  if (::marco::runtime::simulation::getOptions().profiling) {                            \
+    assert(profiler != nullptr);                                                         \
+    profiler->multithreadedSchedule.backwardEquations[thread].dependencyWaiting->stop(); \
   }
 // clang-format on
 
 #else
 
+// clang-format off
 #define SCHEDULER_PROFILER_DO_NOTHING static_assert(true);
 
 #define SCHEDULER_PROFILER_ADD_EQUATION_START SCHEDULER_PROFILER_DO_NOTHING
@@ -153,18 +288,23 @@ void SchedulerProfiler::print() const {
 #define SCHEDULER_PROFILER_RUN_START SCHEDULER_PROFILER_DO_NOTHING
 #define SCHEDULER_PROFILER_RUN_STOP SCHEDULER_PROFILER_DO_NOTHING
 
-#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER                   \
-  SCHEDULER_PROFILER_DO_NOTHING
-#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_RUNS_COUNTER                \
-  SCHEDULER_PROFILER_DO_NOTHING
-
 #define SCHEDULER_PROFILER_INITIALIZATION_START SCHEDULER_PROFILER_DO_NOTHING
 #define SCHEDULER_PROFILER_INITIALIZATION_STOP SCHEDULER_PROFILER_DO_NOTHING
 
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread)                      \
-  SCHEDULER_PROFILER_DO_NOTHING
-#define SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread)                       \
-  SCHEDULER_PROFILER_DO_NOTHING
+#define SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_EXECUTIONS_COUNTER SCHEDULER_PROFILER_DO_NOTHING
+#define SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_EXECUTIONS_COUNTER SCHEDULER_PROFILER_DO_NOTHING
+
+#define SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_START(thread) SCHEDULER_PROFILER_DO_NOTHING
+#define SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_STOP(thread) SCHEDULER_PROFILER_DO_NOTHING
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_ROW_INCREMENT(thread) SCHEDULER_PROFILER_DO_NOTHING
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_FUNC_START(thread) SCHEDULER_PROFILER_DO_NOTHING
+#define SCHEDULER_PROFILER_MT_BACKWARD_FUNC_STOP(thread) SCHEDULER_PROFILER_DO_NOTHING
+
+#define SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_START(thread) SCHEDULER_PROFILER_DO_NOTHING
+#define SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_STOP(thread) SCHEDULER_PROFILER_DO_NOTHING
+// clang-format on
 
 #endif
 
@@ -186,8 +326,9 @@ void Scheduler::EquationPartition::run() {
 namespace marco::runtime {
 
 Scheduler::BackwardEquation::BackwardEquation(
-    const Scheduler::Equation &equation, uint64_t numOfThreads)
-    : equation(&equation) {
+    const Scheduler::Equation &equation, uint64_t numOfThreads,
+    SchedulerProfiler *profiler)
+    : equation(&equation), profiler(profiler) {
   readyStates.resize(2 * numOfThreads);
   size_t numOfColumns = equation.indices[1].end - equation.indices[1].begin;
 
@@ -201,6 +342,7 @@ Scheduler::BackwardEquation::BackwardEquation(
 Scheduler::BackwardEquation::BackwardEquation(BackwardEquation &&other) {
   std::unique_lock<std::mutex> lock(other.rowMutex);
   equation = other.equation;
+  profiler = other.profiler;
   readyStates = std::move(other.readyStates);
   rowInUse = std::move(other.rowInUse);
   nextRow = other.nextRow;
@@ -216,6 +358,7 @@ Scheduler::BackwardEquation::operator=(BackwardEquation &&other) {
     std::unique_lock<std::mutex> rhsLock(other.rowMutex);
 
     equation = other.equation;
+    profiler = other.profiler;
     readyStates = std::move(other.readyStates);
     rowInUse = std::move(other.rowInUse);
     nextRow = other.nextRow;
@@ -230,7 +373,7 @@ const Scheduler::Equation &Scheduler::BackwardEquation::getEquation() const {
   return *equation;
 }
 
-void Scheduler::BackwardEquation::run() {
+void Scheduler::BackwardEquation::run(unsigned int threadId) {
   std::optional<Job> job = claimJob();
 
   while (job) {
@@ -242,6 +385,8 @@ void Scheduler::BackwardEquation::run() {
     functionRanges.resize(rank * 2, 0xDEADBEEF);
 
     do {
+      SCHEDULER_PROFILER_MT_BACKWARD_ROW_INCREMENT(threadId)
+
       // Compute the iteration boundaries that the equation function will use.
       for (size_t dim = 0; dim < rank; ++dim) {
         functionRanges[dim * 2] = indices[dim];
@@ -251,15 +396,21 @@ void Scheduler::BackwardEquation::run() {
       int64_t column = indices[1];
 
       if (job->previousRowState) {
+        SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_START(threadId)
+
         while (!readyStates[*job->previousRowState][column].isReady()) {
           // Intentionally spin-wait until the dependencies are satisfied.
           // Locking a mutex is expensive, and the waiting time tends to zero as
           // the iteration space is progressively visited.
         }
+
+        SCHEDULER_PROFILER_MT_BACKWARD_DEPENDENCY_STOP(threadId)
       }
 
       // Call the equation function on the specific grid cell.
+      SCHEDULER_PROFILER_MT_BACKWARD_FUNC_START(threadId)
       equation->function(functionRanges.data());
+      SCHEDULER_PROFILER_MT_BACKWARD_FUNC_STOP(threadId)
 
       // Mark the cell as processed, so that other threads can continue.
       readyStates[job->currentRowState][column].setReady();
@@ -323,7 +474,8 @@ Scheduler::BackwardEquation::claimJob() {
   std::optional<size_t> previousReadyState = lastAssignedRowState;
   lastAssignedRowState = availableRow;
 
-  std::memset(readyStates[availableRow].data(), false, readyStates[availableRow].size());
+  std::memset(readyStates[availableRow].data(), false,
+              readyStates[availableRow].size());
 
   return Job{nextRow++, availableRow, previousReadyState};
 }
@@ -389,8 +541,7 @@ Scheduler::Scheduler() {
     unsigned int numOfThreads = threadPool.getNumOfThreads();
 
     profiler = std::make_shared<SchedulerProfiler>(identifier);
-    profiler->createPartitionsGroupsCounters(numOfThreads);
-    profiler->createPartitionsGroupsTimers(numOfThreads);
+    profiler->multithreadedSchedule.setNumOfThreads(numOfThreads);
 
     registerProfiler(profiler);
   }
@@ -791,8 +942,8 @@ void Scheduler::initialize() {
           }
         }
       } else if (equation.dependencyKind == DependencyKind::Backward) {
-        multithreadedSchedule.backwardEquations.emplace_back(equation,
-                                                             numOfThreads);
+        multithreadedSchedule.backwardEquations.emplace_back(
+            equation, numOfThreads, profiler.get());
       } else {
         // All the indices must be visited by a single thread.
         std::vector<int64_t> ranges;
@@ -1045,16 +1196,13 @@ void Scheduler::run() {
 }
 
 void Scheduler::runSequential() {
-  SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_RUNS_COUNTER;
-  SCHEDULER_PROFILER_PARTITIONS_GROUP_START(0);
+  SCHEDULER_PROFILER_INCREMENT_SEQUENTIAL_EXECUTIONS_COUNTER;
 
   for (const ContiguousEquationPartition &partition : sequentialSchedule) {
     const Equation &equation = partition.first;
     const auto &ranges = partition.second;
     equation.function(ranges.data());
   }
-
-  SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(0);
 }
 
 void Scheduler::runSequentialWithCalibration() {
@@ -1072,7 +1220,7 @@ void Scheduler::runSequentialWithCalibration() {
 }
 
 void Scheduler::runMultithreaded() {
-  SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_RUNS_COUNTER;
+  SCHEDULER_PROFILER_INCREMENT_MULTITHREADED_EXECUTIONS_COUNTER;
 
   ThreadPool &threadPool = getSchedulersThreadPool();
   unsigned int numOfThreads = threadPool.getNumOfThreads();
@@ -1086,7 +1234,7 @@ void Scheduler::runMultithreaded() {
 
       while ((assignedEquationsGroup = equationsGroupIndex++) <
              multithreadedSchedule.contiguousEquations.size()) {
-        SCHEDULER_PROFILER_PARTITIONS_GROUP_START(thread);
+        SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_START(thread);
 
         const auto &equationsGroup =
             multithreadedSchedule.contiguousEquations[assignedEquationsGroup];
@@ -1097,7 +1245,7 @@ void Scheduler::runMultithreaded() {
           equation.function(ranges.data());
         }
 
-        SCHEDULER_PROFILER_PARTITIONS_GROUP_STOP(thread);
+        SCHEDULER_PROFILER_MT_CONTIGUOUS_GROUP_STOP(thread);
       }
     });
   }
@@ -1107,7 +1255,8 @@ void Scheduler::runMultithreaded() {
   // Run the backward equations.
   for (auto &backwardEquation : multithreadedSchedule.backwardEquations) {
     for (unsigned int thread = 0; thread < numOfThreads; ++thread) {
-      threadPool.async([&]() { backwardEquation.run(); });
+      threadPool.async(
+          [&backwardEquation, thread]() { backwardEquation.run(thread); });
     }
 
     threadPool.wait();
