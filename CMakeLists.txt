@@ -124,6 +124,13 @@ endif()
 # Profiling.
 option(MARCO_PROFILING "Generate code for runtime profiling." ON)
 
+# Add sanitizer
+if (DEFINED MARCO_SANITIZER)
+    message(STATUS "Using sanitizer: ${MARCO_SANITIZER}")
+    add_compile_options("-fsanitize=${MARCO_SANITIZER}")
+    add_link_options("-fsanitize=${MARCO_SANITIZER}")
+endif ()
+
 # Include directories.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${MLIR_INCLUDE_DIRS})
 
