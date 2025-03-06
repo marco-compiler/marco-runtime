@@ -208,9 +208,24 @@ void KINSOLInstance::addJacobianFunction(Equation equation, Variable variable,
                                          uint64_t *seedSizes) {
   if (marco::runtime::simulation::getOptions().debug) {
     std::cerr << "[KINSOL] Setting jacobian function for equation " << equation
-              << " and variable " << variable
-              << ". Address: " << reinterpret_cast<void *>(jacobianFunction)
-              << std::endl;
+              << " and variable " << variable << "\n"
+              << "  - Address: " << reinterpret_cast<void *>(jacobianFunction)
+              << "\n"
+              << "  - Number of seeds : " << numOfSeeds;
+
+    if (numOfSeeds != 0) {
+      std::cerr << "\n" << "  - Seed sizes: ";
+
+      for (uint64_t i = 0; i < numOfSeeds; ++i) {
+        if (i != 0) {
+          std::cerr << ", ";
+        }
+
+        std::cerr << seedSizes[i];
+      }
+    }
+
+    std::cerr << std::endl;
   }
 
   if (jacobianFunctions.size() <= equation) {
