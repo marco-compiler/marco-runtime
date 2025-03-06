@@ -620,13 +620,17 @@ int KINSOLInstance::jacobianMatrix(N_Vector variables, N_Vector residuals,
           auto jacobianFunction =
               instance->jacobianFunctions[eq][variable].first;
 
-          auto seedsMapIt = jacobianSeedsMap.find(jacobianFunction);
-          assert(seedsMapIt != jacobianSeedsMap.end());
           assert(jacobianFunction != nullptr);
+          auto seedsMapIt = jacobianSeedsMap.find(jacobianFunction);
+          const uint64_t *seedsPtr = nullptr;
 
-          auto jacobianFunctionResult = jacobianFunction(
-              equationIndices.data(), variableIndices.data(),
-              instance->memoryPoolId, seedsMapIt->second.data());
+          if (seedsMapIt != jacobianSeedsMap.end()) {
+            seedsPtr = seedsMapIt->second.data();
+          }
+
+          auto jacobianFunctionResult =
+              jacobianFunction(equationIndices.data(), variableIndices.data(),
+                               instance->memoryPoolId, seedsPtr);
 
           instance->jacobianMatrixData[scalarEquationIndex][i].second =
               jacobianFunctionResult;
