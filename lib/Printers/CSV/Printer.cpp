@@ -126,15 +126,7 @@ static void printHeader(const Simulation &simulation) {
 }
 
 namespace marco::runtime::printing {
-CSVPrinter::CSVPrinter(Simulation *simulation)
-    : Printer(simulation),
-      buffer(1 + simulation->getNumOfPrintableScalarVariables(),
-             printOptions().bufferSize,
-             [&](const double *values, uint64_t count) {
-               printBufferedValues(values, count);
-             }) {
-  initialize();
-}
+CSVPrinter::CSVPrinter(Simulation *simulation) : Printer(simulation) {}
 
 #ifdef CLI_ENABLE
 std::unique_ptr<cli::Category> CSVPrinter::getCLIOptions() {
@@ -149,7 +141,7 @@ void CSVPrinter::simulationBegin() {
 }
 
 void CSVPrinter::printValues() {
-  buffer.getActiveBuffer()[0] = getTime();
+  getBuffer().getActiveBuffer()[0] = getTime();
 
   for (int64_t var : getSimulation()->variablesPrintOrder) {
     if (!getSimulation()->printableVariables[var]) {
@@ -167,7 +159,7 @@ void CSVPrinter::printValues() {
     if (rank == 0) {
       // Print the scalar variable.
       double value = getVariableValue(var, nullptr);
-      buffer.getActiveBuffer()[bufferPositions[var]] = value;
+      getBuffer().getActiveBuffer()[bufferPositions[var]] = value;
     } else {
       // Print the components of the array variable.
       size_t relativePos = 0;
@@ -179,19 +171,26 @@ void CSVPrinter::printValues() {
 
         for (auto it = beginIt; it != endIt; ++it) {
           double value = getVariableValue(var, *it);
-          buffer.getActiveBuffer()[bufferPositions[var] + relativePos] = value;
+          getBuffer().getActiveBuffer()[bufferPositions[var] + relativePos] =
+              value;
           ++relativePos;
         }
       }
     }
   }
 
-  buffer.endLine();
+  getBuffer().endLine();
 }
 
-void CSVPrinter::simulationEnd() { buffer.flush(); }
+void CSVPrinter::simulationEnd() { getBuffer().flush(); }
 
 void CSVPrinter::initialize() {
+  buffer = DoubleBuffer(1 + getSimulation()->getNumOfPrintableScalarVariables(),
+                        printOptions().bufferSize,
+                        [&](const double *values, uint64_t count) {
+                          printBufferedValues(values, count);
+                        });
+
   bufferPositions.resize(getSimulation()->printableVariables.size(), 0);
 
   // Time variable.
@@ -204,6 +203,14 @@ void CSVPrinter::initialize() {
     bufferPositions[variable] = position;
     position += getSimulation()->getNumOfPrintableScalarVariables(variable);
   }
+}
+
+DoubleBuffer &CSVPrinter::getBuffer() {
+  if (!buffer) {
+    initialize();
+  }
+
+  return *buffer;
 }
 
 void CSVPrinter::printBufferedValues(const double *values, uint64_t count) {

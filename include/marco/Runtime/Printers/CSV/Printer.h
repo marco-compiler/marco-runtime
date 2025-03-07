@@ -4,6 +4,7 @@
 #include "marco/Runtime/Multithreading/ThreadPool.h"
 #include "marco/Runtime/Printers/DoubleBuffer.h"
 #include "marco/Runtime/Printers/Printer.h"
+#include <optional>
 
 namespace marco::runtime::printing {
 class CSVPrinter : public Printer {
@@ -23,10 +24,12 @@ public:
 private:
   void initialize();
 
+  DoubleBuffer &getBuffer();
+
   void printBufferedValues(const double *values, uint64_t count);
 
 private:
-  DoubleBuffer buffer;
+  std::optional<DoubleBuffer> buffer{std::nullopt};
   std::vector<size_t> bufferPositions;
   ThreadPool threadPool;
 };
