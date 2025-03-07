@@ -1270,6 +1270,7 @@ void KINSOLInstance::printJacobianMatrix(SUNMatrix jacobianMatrix) const {
       printIndices(equationIndices);
 
       uint64_t columnFlatIndex = 0;
+      bool previousNegative = false;
 
       for (Variable var = 0; var < numOfArrayVariables; ++var) {
         std::vector<uint64_t> varIndices;
@@ -1279,7 +1280,13 @@ void KINSOLInstance::printJacobianMatrix(SUNMatrix jacobianMatrix) const {
           auto value = getCellFromSparseMatrix(jacobianMatrix, rowFlatIndex,
                                                columnFlatIndex);
 
+          if (!previousNegative) {
+            std::cerr << " ";
+          }
+
           std::cerr << "\t" << std::fixed << std::setprecision(9) << value;
+          previousNegative = value < 0;
+
           columnFlatIndex++;
         } while (advanceVariableIndices(varIndices, variablesDimensions[var]));
       }
