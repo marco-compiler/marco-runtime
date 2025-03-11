@@ -10,3 +10,10 @@ if (MARCO_PROFILING)
         PUBLIC
         Profiling)
 endif()
+
+marco_add_runtime_shared_library(JITSupport
+        JIT_LIB
+        BuiltInFunctions.cpp
+        Math.cpp
+        Print.cpp
+        UtilityFunctions.cpp)

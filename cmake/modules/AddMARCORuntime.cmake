@@ -1,5 +1,7 @@
 macro(marco_add_runtime_library name)
-    add_library(${name} ${ARGN})
+    cmake_parse_arguments(ARG "JIT_LIB" "" "" ${ARGN})
+
+    add_library(${name} ${ARG_UNPARSED_ARGUMENTS})
     add_dependencies(marco-runtime ${name})
     add_library(MARCORuntime::${name} ALIAS ${name})
 
@@ -10,9 +12,11 @@ macro(marco_add_runtime_library name)
         target_compile_definitions(${name} PRIVATE SUNDIALS_ENABLE)
     endif()
 
-    # Enable the profiling framework.
-    if (MARCO_PROFILING)
-        target_compile_definitions(${name} PUBLIC MARCO_PROFILING)
+    if (NOT ARG_JIT_LIB)
+        # Enable the profiling framework.
+        if (MARCO_PROFILING)
+            target_compile_definitions(${name} PUBLIC MARCO_PROFILING)
+        endif ()
     endif()
 
     install(TARGETS ${name}
