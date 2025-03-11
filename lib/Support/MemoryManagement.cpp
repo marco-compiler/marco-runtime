@@ -204,8 +204,10 @@ double *MemoryPool::get(uint64_t id) const {
 
 uint64_t MemoryPool::create(size_t numOfElements) {
   uint64_t id = buffers.size();
+
   buffers.push_back(
-      static_cast<double *>(std::malloc(sizeof(double) * numOfElements)));
+      static_cast<double *>(std::calloc(numOfElements, sizeof(double))));
+
   return id;
 }
 
