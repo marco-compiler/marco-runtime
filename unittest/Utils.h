@@ -4,9 +4,8 @@
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 #include <array>
 
-template<typename T, size_t Size>
-StridedMemRefType<T, 1> getMemRef(std::array<T, Size>& data)
-{
+template <typename T, size_t Size>
+StridedMemRefType<T, 1> getMemRef(std::array<T, Size> &data) {
   StridedMemRefType<T, 1> result;
 
   result.basePtr = data.data();
@@ -18,9 +17,9 @@ StridedMemRefType<T, 1> getMemRef(std::array<T, Size>& data)
   return result;
 }
 
-template<typename T, size_t Rank>
-StridedMemRefType<T, Rank> getMemRef(T* data, std::array<int64_t, Rank> dimensions)
-{
+template <typename T, size_t Rank>
+StridedMemRefType<T, Rank> getMemRef(T *data,
+                                     std::array<int64_t, Rank> dimensions) {
   StridedMemRefType<T, Rank> result;
 
   result.basePtr = data;
@@ -38,13 +37,12 @@ StridedMemRefType<T, Rank> getMemRef(T* data, std::array<int64_t, Rank> dimensio
   return result;
 }
 
-template<typename T, int Rank>
-UnrankedMemRefType<T> getUnrankedMemRef(StridedMemRefType<T, Rank>& memRef)
-{
+template <typename T, int Rank>
+UnrankedMemRefType<T> getUnrankedMemRef(StridedMemRefType<T, Rank> &memRef) {
   UnrankedMemRefType<T> result;
 
   result.rank = Rank;
-  result.descriptor = static_cast<void*>(&memRef);
+  result.descriptor = static_cast<void *>(&memRef);
 
   return result;
 }

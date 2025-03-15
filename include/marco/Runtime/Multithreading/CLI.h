@@ -6,20 +6,18 @@
 
 #include "marco/Runtime/CLI/CLI.h"
 
-namespace marco::runtime::multithreading
-{
-  class CommandLineOptions : public cli::Category
-  {
-    public:
-      std::string getTitle() const override;
+namespace marco::runtime::multithreading {
+class CommandLineOptions : public cli::Category {
+public:
+  std::string getTitle() const override;
 
-      void printCommandLineOptions(std::ostream& os) const override;
+  void printCommandLineOptions(std::ostream &os) const override;
 
-      void parseCommandLineOptions(const argh::parser& options) const override;
-  };
+  void parseCommandLineOptions(const argh::parser &options) const override;
+};
 
-  std::unique_ptr<cli::Category> getCLIOptions();
-}
+std::unique_ptr<cli::Category> getCLIOptions();
+} // namespace marco::runtime::multithreading
 
 #endif // THREADS_ENABLE
 #endif // CLI_ENABLE

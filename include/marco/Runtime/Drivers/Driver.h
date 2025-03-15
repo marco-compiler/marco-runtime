@@ -4,35 +4,33 @@
 #include "marco/Runtime/CLI/Category.h"
 #include <memory>
 
-namespace marco::runtime
-{
-  class Simulation;
+namespace marco::runtime {
+class Simulation;
 
-  class Driver
-  {
-    public:
-      Driver(Simulation* simulation);
+class Driver {
+public:
+  Driver(Simulation *simulation);
 
-      virtual ~Driver();
+  virtual ~Driver();
 
 #ifdef CLI_ENABLE
-      /// Get the CLI options to be printed for the selected solver.
-      virtual std::unique_ptr<cli::Category> getCLIOptions() = 0;
+  /// Get the CLI options to be printed for the selected solver.
+  virtual std::unique_ptr<cli::Category> getCLIOptions() = 0;
 #endif // CLI_ENABLE
 
-      virtual int run() = 0;
+  virtual int run() = 0;
 
-    protected:
-      Simulation* getSimulation();
+protected:
+  Simulation *getSimulation();
 
-      const Simulation* getSimulation() const;
+  const Simulation *getSimulation() const;
 
-    private:
-      Simulation* simulation;
-  };
+private:
+  Simulation *simulation;
+};
 
-  /// Get the driver to be used for the simulation.
-  std::unique_ptr<Driver> getDriver(Simulation* simulation);
-}
+/// Get the driver to be used for the simulation.
+std::unique_ptr<Driver> getDriver(Simulation *simulation);
+} // namespace marco::runtime
 
 #endif // MARCO_RUNTIME_DRIVERS_DRIVER_H

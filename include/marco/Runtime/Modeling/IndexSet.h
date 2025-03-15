@@ -4,9 +4,8 @@
 #include "marco/Runtime/Modeling/MultidimensionalRange.h"
 #include <vector>
 
-namespace marco::runtime
-{
-  using IndexSet = std::vector<MultidimensionalRange>;
+namespace marco::runtime {
+using IndexSet = std::vector<MultidimensionalRange>;
 }
 
 #endif // MARCO_RUNTIME_MODELING_INDEXSET_H

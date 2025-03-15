@@ -6,7 +6,7 @@
 #include <cstdint>
 
 RUNTIME_FUNC_DECL(abs, bool, bool)
-RUNTIME_FUNC_DECL(abs, int32_t , int32_t)
+RUNTIME_FUNC_DECL(abs, int32_t, int32_t)
 RUNTIME_FUNC_DECL(abs, int64_t, int64_t)
 RUNTIME_FUNC_DECL(abs, float, float)
 RUNTIME_FUNC_DECL(abs, double, double)
@@ -256,4 +256,4 @@ RUNTIME_FUNC_DECL(zeros, void, ARRAY(int64_t))
 RUNTIME_FUNC_DECL(zeros, void, ARRAY(float))
 RUNTIME_FUNC_DECL(zeros, void, ARRAY(double))
 
-#endif	// MARCO_RUNTIME_BUILTINFUNCTIONS_H
+#endif // MARCO_RUNTIME_BUILTINFUNCTIONS_H

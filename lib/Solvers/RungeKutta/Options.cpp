@@ -2,10 +2,8 @@
 
 using namespace ::marco::runtime::rungekutta;
 
-namespace marco::runtime::rungekutta
-{
-Options& getOptions()
-{
+namespace marco::runtime::rungekutta {
+Options &getOptions() {
   static Options options;
   return options;
 }

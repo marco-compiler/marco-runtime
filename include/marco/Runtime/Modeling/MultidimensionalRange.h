@@ -5,56 +5,52 @@
 #include <functional>
 #include <vector>
 
-namespace marco::runtime
-{
-  using MultidimensionalRange = std::vector<Range>;
+namespace marco::runtime {
+using MultidimensionalRange = std::vector<Range>;
 
-  class MultidimensionalRangeIterator
-  {
-    public:
-      using iterator_category = std::forward_iterator_tag;
-      using value_type = const int64_t*;
-      using difference_type = std::ptrdiff_t;
-      using pointer = const int64_t**;
-      using reference = const int64_t*&;
+class MultidimensionalRangeIterator {
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = const int64_t *;
+  using difference_type = std::ptrdiff_t;
+  using pointer = const int64_t **;
+  using reference = const int64_t *&;
 
-      static MultidimensionalRangeIterator begin(const MultidimensionalRange& range);
-      static MultidimensionalRangeIterator end(const MultidimensionalRange& range);
+  static MultidimensionalRangeIterator
+  begin(const MultidimensionalRange &range);
+  static MultidimensionalRangeIterator end(const MultidimensionalRange &range);
 
-      bool operator==(const MultidimensionalRangeIterator& it) const;
+  bool operator==(const MultidimensionalRangeIterator &it) const;
 
-      bool operator!=(const MultidimensionalRangeIterator& it) const;
+  bool operator!=(const MultidimensionalRangeIterator &it) const;
 
-      MultidimensionalRangeIterator& operator++();
+  MultidimensionalRangeIterator &operator++();
 
-      MultidimensionalRangeIterator operator++(int);
+  MultidimensionalRangeIterator operator++(int);
 
-      const int64_t* operator*() const;
+  const int64_t *operator*() const;
 
-    private:
-      MultidimensionalRangeIterator(
-        const MultidimensionalRange& range,
-        std::function<RangeIterator(const Range&)> initFunction);
+private:
+  MultidimensionalRangeIterator(
+      const MultidimensionalRange &range,
+      std::function<RangeIterator(const Range &)> initFunction);
 
-      void fetchNext();
+  void fetchNext();
 
-    private:
-      std::vector<RangeIterator> beginIterators;
-      std::vector<RangeIterator> currentIterators;
-      std::vector<RangeIterator> endIterators;
-      std::vector<int64_t> indices;
-  };
+private:
+  std::vector<RangeIterator> beginIterators;
+  std::vector<RangeIterator> currentIterators;
+  std::vector<RangeIterator> endIterators;
+  std::vector<int64_t> indices;
+};
 
-  uint64_t getFlatSize(const MultidimensionalRange& ranges);
+uint64_t getFlatSize(const MultidimensionalRange &ranges);
 
-  uint64_t getFlatIndex(
-      const std::vector<int64_t>& indices,
-      const MultidimensionalRange& ranges);
+uint64_t getFlatIndex(const std::vector<int64_t> &indices,
+                      const MultidimensionalRange &ranges);
 
-  void getIndicesFromFlatIndex(
-      uint64_t flatIndex,
-      std::vector<int64_t>& result,
-      const MultidimensionalRange& ranges);
-}
+void getIndicesFromFlatIndex(uint64_t flatIndex, std::vector<int64_t> &result,
+                             const MultidimensionalRange &ranges);
+} // namespace marco::runtime
 
 #endif // MARCO_RUNTIME_MODELING_MULTIDIMENSIONALRANGE_H

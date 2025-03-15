@@ -7,23 +7,21 @@
 #include <memory>
 #include <vector>
 
-namespace marco::runtime
-{
-  class CLI
-  {
-    public:
-      const cli::Category& operator[](size_t index) const;
+namespace marco::runtime {
+class CLI {
+public:
+  const cli::Category &operator[](size_t index) const;
 
-      void operator+=(std::unique_ptr<cli::Category> category);
+  void operator+=(std::unique_ptr<cli::Category> category);
 
-      size_t size() const;
+  size_t size() const;
 
-    private:
-      std::vector<std::unique_ptr<cli::Category>> categories;
-  };
+private:
+  std::vector<std::unique_ptr<cli::Category>> categories;
+};
 
-  CLI& getCLI();
-}
+CLI &getCLI();
+} // namespace marco::runtime
 
 #endif // CLI_ENABLE
 

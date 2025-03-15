@@ -2,17 +2,10 @@
 #include <iostream>
 #include <vector>
 
-namespace marco::runtime::profiling
-{
-  Profiler::Profiler(const std::string& name)
-      : name(name)
-  {
-  }
+namespace marco::runtime::profiling {
+Profiler::Profiler(const std::string &name) : name(name) {}
 
-  Profiler::~Profiler() = default;
+Profiler::~Profiler() = default;
 
-  const std::string& Profiler::getName() const
-  {
-    return name;
-  }
-}
+const std::string &Profiler::getName() const { return name; }
+} // namespace marco::runtime::profiling
