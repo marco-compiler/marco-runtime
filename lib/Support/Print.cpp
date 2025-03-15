@@ -32,14 +32,14 @@ namespace
   template<typename T>
   void print_void(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType memRef(*array);
-    std::cout << std::scientific << memRef << std::endl;
+  DynamicMemRefType<T> memRef(*array);
+  std::cout << std::scientific << memRef << std::endl;
   }
 
   template<>
   void print_void<bool>(UnrankedMemRefType<bool>* array)
   {
-    DynamicMemRefType memRef(*array);
+    DynamicMemRefType<bool> memRef(*array);
     std::cout << std::boolalpha << memRef << std::endl;
   }
 }

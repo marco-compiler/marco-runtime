@@ -1,5 +1,4 @@
 #include "marco/Runtime/Support/BuiltInFunctions.h"
-#include "marco/Runtime/Support/Utils.h"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -217,9 +216,9 @@ namespace
   template<typename T, typename U>
   void diagonal_void(UnrankedMemRefType<T>* destination, UnrankedMemRefType<U>* values)
   {
-    DynamicMemRefType dynamicDestination(*destination);
+  DynamicMemRefType<T> dynamicDestination(*destination);
 
-    // Check that the array is square-like (all the dimensions have the same
+  // Check that the array is square-like (all the dimensions have the same
     // size). Note that the implementation is generalized to n-D dimensions,
     // while the "identity" Modelica function is defined only for 2-D arrays.
     // Still, the implementation complexity would be the same.
@@ -292,8 +291,6 @@ namespace
   bool div_i1(bool x, bool y)
   {
     assert(y && "Division by zero");
-    return x;
-
     return x;
   }
 
@@ -395,9 +392,9 @@ namespace
   template<typename T>
   void identity_void(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+  DynamicMemRefType<T> dynamicArray(*array);
 
-    // Check that the array is square-like (all the dimensions have the same
+  // Check that the array is square-like (all the dimensions have the same
     // size). Note that the implementation is generalized to n-D dimensions,
     // while the "identity" Modelica function is defined only for 2-D arrays.
     // Still, the implementation complexity would be the same.
@@ -557,13 +554,13 @@ namespace
   template<typename T>
   T maxArray(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
-    return *std::max_element(std::begin(dynamicArray), std::end(dynamicArray));
+  DynamicMemRefType<T> dynamicArray(*array);
+  return *std::max_element(std::begin(dynamicArray), std::end(dynamicArray));
   }
 
   bool maxArray_i1(UnrankedMemRefType<bool>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+    DynamicMemRefType<bool> dynamicArray(*array);
 
     return std::any_of(std::begin(dynamicArray), std::end(dynamicArray), [](const bool& value) {
       return value;
@@ -650,13 +647,13 @@ namespace
   template<typename T>
   T minArray(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
-    return *std::min_element(std::begin(dynamicArray), std::end(dynamicArray));
+  DynamicMemRefType<T> dynamicArray(*array);
+  return *std::min_element(std::begin(dynamicArray), std::end(dynamicArray));
   }
 
   bool minArray_i1(UnrankedMemRefType<bool>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+    DynamicMemRefType<bool> dynamicArray(*array);
 
     return std::all_of(std::begin(dynamicArray), std::end(dynamicArray), [](const bool& value) {
       return value;
@@ -791,9 +788,9 @@ namespace
   template<typename T>
   void ones_void(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+  DynamicMemRefType<T> dynamicArray(*array);
 
-    for (auto it = std::begin(dynamicArray), end = std::end(dynamicArray); it != end; ++it) {
+  for (auto it = std::begin(dynamicArray), end = std::end(dynamicArray); it != end; ++it) {
       *it = 1;
     }
   }
@@ -819,13 +816,13 @@ namespace
   template<typename T>
   T product(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
-    return std::accumulate(std::begin(dynamicArray), std::end(dynamicArray), static_cast<T>(1), std::multiplies<T>());
+  DynamicMemRefType<T> dynamicArray(*array);
+  return std::accumulate(std::begin(dynamicArray), std::end(dynamicArray), static_cast<T>(1), std::multiplies<T>());
   }
 
   bool product_i1(UnrankedMemRefType<bool>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+    DynamicMemRefType<bool> dynamicArray(*array);
 
     return std::all_of(std::begin(dynamicArray), std::end(dynamicArray), [](const bool& value) {
       return value;
@@ -1041,13 +1038,13 @@ namespace
   template<typename T>
   T sum(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
-    return std::accumulate(std::begin(dynamicArray), std::end(dynamicArray), static_cast<T>(0), std::plus<T>());
+  DynamicMemRefType<T> dynamicArray(*array);
+  return std::accumulate(std::begin(dynamicArray), std::end(dynamicArray), static_cast<T>(0), std::plus<T>());
   }
 
   bool sum_i1(UnrankedMemRefType<bool>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+    DynamicMemRefType<bool> dynamicArray(*array);
 
     return std::any_of(std::begin(dynamicArray), std::end(dynamicArray), [](const bool& value) {
       return value;
@@ -1291,9 +1288,9 @@ namespace
   template<typename T>
   void zeros_void(UnrankedMemRefType<T>* array)
   {
-    DynamicMemRefType dynamicArray(*array);
+  DynamicMemRefType<T> dynamicArray(*array);
 
-    for (auto it = std::begin(dynamicArray), end = std::end(dynamicArray); it != end; ++it) {
+  for (auto it = std::begin(dynamicArray), end = std::end(dynamicArray); it != end; ++it) {
       *it = 0;
     }
   }
