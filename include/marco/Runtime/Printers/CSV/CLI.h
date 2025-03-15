@@ -5,17 +5,15 @@
 
 #include "marco/Runtime/CLI/CLI.h"
 
-namespace marco::runtime::printing
-{
-  class CommandLineOptions : public cli::Category
-  {
-    std::string getTitle() const override;
+namespace marco::runtime::printing {
+class CommandLineOptions : public cli::Category {
+  std::string getTitle() const override;
 
-    void printCommandLineOptions(std::ostream& os) const override;
+  void printCommandLineOptions(std::ostream &os) const override;
 
-    void parseCommandLineOptions(const argh::parser& options) const override;
-  };
-}
+  void parseCommandLineOptions(const argh::parser &options) const override;
+};
+} // namespace marco::runtime::printing
 
 #endif // CLI_ENABLE
 

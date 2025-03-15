@@ -3,12 +3,10 @@
 
 #include "marco/Runtime/Drivers/Driver.h"
 
-namespace marco::runtime
-{
-class RungeKutta : public Driver
-{
+namespace marco::runtime {
+class RungeKutta : public Driver {
 public:
-  RungeKutta(Simulation* simulation);
+  RungeKutta(Simulation *simulation);
 
 #ifdef CLI_ENABLE
   std::unique_ptr<cli::Category> getCLIOptions() override;
@@ -22,8 +20,7 @@ public:
 // Functions defined inside the module of the compiled model
 //===---------------------------------------------------------------------===//
 
-extern "C"
-{
+extern "C" {
 void tryStep(double timeStep);
 double estimateError();
 void acceptStep();

@@ -5,16 +5,14 @@
 
 #include <thread>
 
-namespace marco::runtime::multithreading
-{
-  struct MultithreadingOptions
-  {
-    bool enableMultithreading = true;
-    unsigned int numOfThreads = std::thread::hardware_concurrency();
-  };
+namespace marco::runtime::multithreading {
+struct MultithreadingOptions {
+  bool enableMultithreading = true;
+  unsigned int numOfThreads = std::thread::hardware_concurrency();
+};
 
-  MultithreadingOptions& multithreadingOptions();
-}
+MultithreadingOptions &multithreadingOptions();
+} // namespace marco::runtime::multithreading
 
 #endif // THREADS_ENABLE
 

@@ -17,8 +17,8 @@ namespace {
 template <typename T, typename U>
 void clone_void(UnrankedMemRefType<T> *destination,
                 UnrankedMemRefType<U> *source) {
-  DynamicMemRefType dynamicSource(*source);
-  DynamicMemRefType dynamicDestination(*destination);
+  DynamicMemRefType<U> dynamicSource(*source);
+  DynamicMemRefType<T> dynamicDestination(*destination);
 
   // Check that the two arrays have the same number of elements
   [[maybe_unused]] int64_t sourceFlatSize = std::accumulate(

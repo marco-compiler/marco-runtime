@@ -4,50 +4,47 @@
 #include <cstdint>
 #include <iterator>
 
-namespace marco::runtime
-{
-  /// Mono-dimensional range in the form [begin, end).
-  struct Range
-  {
-    int64_t begin;
-    int64_t end;
+namespace marco::runtime {
+/// Mono-dimensional range in the form [begin, end).
+struct Range {
+  int64_t begin;
+  int64_t end;
 
-    Range();
+  Range();
 
-    Range(int64_t begin, int64_t end);
+  Range(int64_t begin, int64_t end);
 
-    bool operator<(const Range& other) const;
-  };
+  bool operator<(const Range &other) const;
+};
 
-  class RangeIterator
-  {
-    public:
-      using iterator_category = std::input_iterator_tag;
-      using value_type = int64_t;
-      using difference_type = std::ptrdiff_t;
-      using pointer = int64_t*;
-      using reference = int64_t&;
+class RangeIterator {
+public:
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int64_t;
+  using difference_type = std::ptrdiff_t;
+  using pointer = int64_t *;
+  using reference = int64_t &;
 
-      static RangeIterator begin(const Range& range);
-      static RangeIterator end(const Range& range);
+  static RangeIterator begin(const Range &range);
+  static RangeIterator end(const Range &range);
 
-      bool operator==(const RangeIterator& it) const;
+  bool operator==(const RangeIterator &it) const;
 
-      bool operator!=(const RangeIterator& it) const;
+  bool operator!=(const RangeIterator &it) const;
 
-      RangeIterator& operator++();
+  RangeIterator &operator++();
 
-      RangeIterator operator++(int);
+  RangeIterator operator++(int);
 
-      value_type operator*() const;
+  value_type operator*() const;
 
-    private:
-      RangeIterator(int64_t begin, int64_t end);
+private:
+  RangeIterator(int64_t begin, int64_t end);
 
-    private:
-      int64_t current_;
-      int64_t end_;
-  };
-}
+private:
+  int64_t current_;
+  int64_t end_;
+};
+} // namespace marco::runtime
 
 #endif // MARCO_RUNTIME_MODELING_RANGE_H

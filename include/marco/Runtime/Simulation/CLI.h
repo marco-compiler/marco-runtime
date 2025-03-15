@@ -5,22 +5,20 @@
 
 #include "marco/Runtime/CLI/CLI.h"
 
-namespace marco::runtime::simulation
-{
-  class CommandLineOptions : public cli::Category
-  {
-    public:
-      std::string getTitle() const override;
+namespace marco::runtime::simulation {
+class CommandLineOptions : public cli::Category {
+public:
+  std::string getTitle() const override;
 
-      void printCommandLineOptions(std::ostream& os) const override;
+  void printCommandLineOptions(std::ostream &os) const override;
 
-      void parseCommandLineOptions(const argh::parser& options) const override;
-  };
+  void parseCommandLineOptions(const argh::parser &options) const override;
+};
 
 #ifdef CLI_ENABLE
-  std::unique_ptr<cli::Category> getCLIOptions();
+std::unique_ptr<cli::Category> getCLIOptions();
 #endif // CLI_ENABLE
-}
+} // namespace marco::runtime::simulation
 
 #endif // CLI_ENABLE
 

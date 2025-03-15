@@ -3,14 +3,12 @@
 
 #include "marco/Runtime/Support/Mangling.h"
 
-namespace marco::runtime::eulerforward
-{
-  struct Options
-  {
-    double timeStep = 0.1;
-  };
+namespace marco::runtime::eulerforward {
+struct Options {
+  double timeStep = 0.1;
+};
 
-  Options& getOptions();
-}
+Options &getOptions();
+} // namespace marco::runtime::eulerforward
 
 #endif // MARCO_RUNTIME_SOLVERS_EULERFORWARD_OPTIONS_H

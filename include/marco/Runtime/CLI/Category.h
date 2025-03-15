@@ -6,21 +6,18 @@
 #include "argh.h"
 #include <string>
 
-namespace marco::runtime::cli
-{
-  class Category
-  {
-    public:
-      virtual ~Category();
+namespace marco::runtime::cli {
+class Category {
+public:
+  virtual ~Category();
 
-      virtual std::string getTitle() const = 0;
+  virtual std::string getTitle() const = 0;
 
-      virtual void printCommandLineOptions(std::ostream& os) const = 0;
+  virtual void printCommandLineOptions(std::ostream &os) const = 0;
 
-      virtual void parseCommandLineOptions(
-          const argh::parser& options) const = 0;
-  };
-}
+  virtual void parseCommandLineOptions(const argh::parser &options) const = 0;
+};
+} // namespace marco::runtime::cli
 
 #endif // CLI_ENABLE
 

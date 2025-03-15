@@ -3,16 +3,12 @@
 
 #ifdef MARCO_PROFILING
 
-namespace marco::runtime::profiling
-{
-RungeKuttaProfiler::RungeKuttaProfiler()
-    : Profiler("Runge-Kutta")
-{
+namespace marco::runtime::profiling {
+RungeKuttaProfiler::RungeKuttaProfiler() : Profiler("Runge-Kutta") {
   registerProfiler(*this);
 }
 
-void RungeKuttaProfiler::reset()
-{
+void RungeKuttaProfiler::reset() {
   std::lock_guard<std::mutex> lockGuard(mutex);
 
   variablesCopy.reset();
@@ -20,8 +16,7 @@ void RungeKuttaProfiler::reset()
   nonStateVariables.reset();
 }
 
-void RungeKuttaProfiler::print() const
-{
+void RungeKuttaProfiler::print() const {
   std::lock_guard<std::mutex> lockGuard(mutex);
 
   std::cerr << "Time spent on copying variables: "
@@ -34,8 +29,7 @@ void RungeKuttaProfiler::print() const
             << nonStateVariables.totalElapsedTime<std::milli>() << " ms\n";
 }
 
-RungeKuttaProfiler& rungeKuttaProfiler()
-{
+RungeKuttaProfiler &rungeKuttaProfiler() {
   static RungeKuttaProfiler obj;
   return obj;
 }

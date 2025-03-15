@@ -5,31 +5,29 @@
 #include <memory>
 #include <vector>
 
-namespace marco::runtime::profiling
-{
-  class Statistics
-  {
-    public:
-      void registerProfiler(Profiler& profiler);
-      void registerProfiler(std::shared_ptr<Profiler> profiler);
+namespace marco::runtime::profiling {
+class Statistics {
+public:
+  void registerProfiler(Profiler &profiler);
+  void registerProfiler(std::shared_ptr<Profiler> profiler);
 
-      void reset();
+  void reset();
 
-      void print() const;
+  void print() const;
 
-    private:
-      void printHeaderLine(size_t width) const;
+private:
+  void printHeaderLine(size_t width) const;
 
-      void printHeaderTitle(size_t width, const std::string& title) const;
+  void printHeaderTitle(size_t width, const std::string &title) const;
 
-      void printHeader(size_t width, const std::string& title) const;
+  void printHeader(size_t width, const std::string &title) const;
 
-      void printProfilerTitle(size_t width, const std::string& title) const;
+  void printProfilerTitle(size_t width, const std::string &title) const;
 
-    private:
-      std::vector<Profiler*> profilers;
-      std::vector<std::shared_ptr<Profiler>> sharedProfilers;
-  };
-}
+private:
+  std::vector<Profiler *> profilers;
+  std::vector<std::shared_ptr<Profiler>> sharedProfilers;
+};
+} // namespace marco::runtime::profiling
 
 #endif // MARCO_RUNTIME_PROFILING_STATISTICS_H

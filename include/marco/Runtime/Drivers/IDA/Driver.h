@@ -3,19 +3,17 @@
 
 #include "marco/Runtime/Drivers/Driver.h"
 
-namespace marco::runtime
-{
-  class IDA : public Driver
-  {
-    public:
-      IDA(Simulation* simulation);
+namespace marco::runtime {
+class IDA : public Driver {
+public:
+  IDA(Simulation *simulation);
 
 #ifdef CLI_ENABLE
-      std::unique_ptr<cli::Category> getCLIOptions() override;
+  std::unique_ptr<cli::Category> getCLIOptions() override;
 #endif // CLI_ENABLE
 
-      int run() override;
-  };
-}
+  int run() override;
+};
+} // namespace marco::runtime
 
 #endif // MARCO_RUNTIME_DRIVERS_IDA_DRIVER_H
