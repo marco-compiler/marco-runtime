@@ -2,8 +2,8 @@
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <cstring>
+#include <numeric>
 
 #include "Utils.h"
 
@@ -3277,29 +3277,31 @@ TEST(Runtime, zeros_f64) {
   EXPECT_DOUBLE_EQ(array[1][1], 0);
 }
 
-TEST(Runtime, assert_void)
-{
-  auto assertFn = [](bool cond, char* msg, int64_t assertionLevel) -> void {
-    return NAME_MANGLED(assert, void, bool, PTR(void), int64_t)(cond, (void*)msg, assertionLevel);
+TEST(Runtime, assert_void) {
+  auto assertFn = [](bool cond, char *msg, int64_t assertionLevel) -> void {
+    return NAME_MANGLED(assert, void, bool, PTR(void),
+                        int64_t)(cond, (void *)msg, assertionLevel);
   };
 
   std::string s("test");
 
-  EXPECT_EXIT({
-    assertFn(true, s.data(), 0);
-    std::cerr<<"success"<<std::endl;
-    std::exit(0);
-  }, testing::ExitedWithCode(0), "success");
-  EXPECT_EXIT({
-    assertFn(true, s.data(), 1);
-    std::cerr<<"success"<<std::endl;
-    std::exit(0);
-  }, testing::ExitedWithCode(0), "success");
-  
   EXPECT_EXIT(
-    assertFn(false, s.data(), 0),
-    testing::KilledBySignal(SIGABRT), "Warning: " + s);
+      {
+        assertFn(true, s.data(), 0);
+        std::cerr << "success" << std::endl;
+        std::exit(0);
+      },
+      testing::ExitedWithCode(0), "success");
   EXPECT_EXIT(
-    assertFn(false, s.data(), 1),
-    testing::KilledBySignal(SIGABRT), "Error: " + s);
+      {
+        assertFn(true, s.data(), 1);
+        std::cerr << "success" << std::endl;
+        std::exit(0);
+      },
+      testing::ExitedWithCode(0), "success");
+
+  EXPECT_EXIT(assertFn(false, s.data(), 0), testing::KilledBySignal(SIGABRT),
+              "Warning: " + s);
+  EXPECT_EXIT(assertFn(false, s.data(), 1), testing::KilledBySignal(SIGABRT),
+              "Error: " + s);
 }

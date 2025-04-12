@@ -1,10 +1,10 @@
 #include "marco/Runtime/Support/BuiltInFunctions.h"
 #include <algorithm>
 #include <cmath>
-#include <numeric>
-#include <vector>
-#include <string>
 #include <iostream>
+#include <numeric>
+#include <string>
+#include <vector>
 
 //===----------------------------------------------------------------------===//
 // abs
@@ -1043,18 +1043,18 @@ RUNTIME_FUNC_DEF(zeros, void, ARRAY(double))
 //===----------------------------------------------------------------------===//
 
 namespace {
-  void assert_void(bool condition, void* msg, int64_t level) {
-    std::string inMsg((char*)msg); 
-    std::string abortMsg;
+void assert_void(bool condition, void *msg, int64_t level) {
+  std::string inMsg((char *)msg);
+  std::string abortMsg;
 
-    abortMsg = (level) ? "Error: " : "Warning: ";
-    abortMsg += inMsg;
+  abortMsg = (level) ? "Error: " : "Warning: ";
+  abortMsg += inMsg;
 
-    if(!condition) {
-      std::cerr << abortMsg << std::endl;
-      std::abort();
-    }
+  if (!condition) {
+    std::cerr << abortMsg << std::endl;
+    std::abort();
   }
+}
 } // namespace
 
 RUNTIME_FUNC_DEF(assert, void, bool, PTR(void), int64_t)
