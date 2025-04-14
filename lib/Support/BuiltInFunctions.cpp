@@ -1,7 +1,9 @@
 #include "marco/Runtime/Support/BuiltInFunctions.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <numeric>
+#include <string>
 #include <vector>
 
 //===----------------------------------------------------------------------===//
@@ -1035,3 +1037,31 @@ RUNTIME_FUNC_DEF(zeros, void, ARRAY(int32_t))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(int64_t))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(float))
 RUNTIME_FUNC_DEF(zeros, void, ARRAY(double))
+
+//===----------------------------------------------------------------------===//
+// assert
+//===----------------------------------------------------------------------===//
+
+namespace {
+void assert_void(bool condition, void *msg, int64_t level) {
+  std::string inMsg((char *)msg);
+  std::string abortMsg;
+
+  if (!condition) {
+    assert(level >= 0);
+
+    if (level == 0) {
+      abortMsg = "Warning: ";
+    } else {
+      abortMsg = "Error: ";
+    }
+
+    abortMsg += inMsg;
+
+    std::cerr << abortMsg << std::endl;
+    std::abort();
+  }
+}
+} // namespace
+
+RUNTIME_FUNC_DEF(assert, void, bool, PTR(void), int64_t)

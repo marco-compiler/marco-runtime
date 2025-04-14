@@ -256,4 +256,6 @@ RUNTIME_FUNC_DECL(zeros, void, ARRAY(int64_t))
 RUNTIME_FUNC_DECL(zeros, void, ARRAY(float))
 RUNTIME_FUNC_DECL(zeros, void, ARRAY(double))
 
+RUNTIME_FUNC_DECL(assert, void, bool, PTR(void), int64_t)
+
 #endif // MARCO_RUNTIME_BUILTINFUNCTIONS_H
