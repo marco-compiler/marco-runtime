@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <numeric>
 
 #include "Utils.h"
