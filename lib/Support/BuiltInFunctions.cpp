@@ -1047,10 +1047,17 @@ void assert_void(bool condition, void *msg, int64_t level) {
   std::string inMsg((char *)msg);
   std::string abortMsg;
 
-  abortMsg = (level) ? "Error: " : "Warning: ";
-  abortMsg += inMsg;
-
   if (!condition) {
+    assert(level >= 0);
+
+    if (level == 0) {
+      abortMsg = "Warning: ";
+    } else {
+      abortMsg = "Error: ";
+    }
+
+    abortMsg += inMsg;
+
     std::cerr << abortMsg << std::endl;
     std::abort();
   }
