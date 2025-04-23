@@ -17,6 +17,8 @@ RUNTIME_FUNC_DECL(acos, double, double)
 RUNTIME_FUNC_DECL(asin, float, float)
 RUNTIME_FUNC_DECL(asin, double, double)
 
+RUNTIME_FUNC_DECL(assert, void, bool, PTR(void), uint64_t)
+
 RUNTIME_FUNC_DECL(atan, float, float)
 RUNTIME_FUNC_DECL(atan, double, double)
 

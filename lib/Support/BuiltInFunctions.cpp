@@ -1,7 +1,9 @@
 #include "marco/Runtime/Support/BuiltInFunctions.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <numeric>
+#include <string>
 #include <vector>
 
 //===----------------------------------------------------------------------===//
@@ -51,6 +53,28 @@ double asin_f64(double value) { return std::asin(value); }
 
 RUNTIME_FUNC_DEF(asin, float, float)
 RUNTIME_FUNC_DEF(asin, double, double)
+
+//===----------------------------------------------------------------------===//
+// assert
+//===----------------------------------------------------------------------===//
+
+namespace {
+void assert_void(bool condition, void *message, uint64_t level) {
+  assert((level == 0 || level == 1) && "Unexpected assert level");
+
+  if (!condition) {
+    if (level == 0) {
+      std::cerr << "warning: " << static_cast<const char *>(message)
+                << std::endl;
+    } else {
+      std::cerr << "error: " << static_cast<const char *>(message) << std::endl;
+      std::abort();
+    }
+  }
+}
+} // namespace
+
+RUNTIME_FUNC_DEF(assert, void, bool, PTR(void), uint64_t)
 
 //===----------------------------------------------------------------------===//
 // atan
