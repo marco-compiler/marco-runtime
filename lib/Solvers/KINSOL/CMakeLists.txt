@@ -8,6 +8,17 @@ marco_add_runtime_shared_library(OptionsKINSOL
 marco_add_runtime_static_library(OptionsKINSOL_static
     ${OPTIONS_SRC})
 
+set(OPTIONS_LINKED_LIBS
+    SUNDIALS::kinsol)
+
+target_link_libraries(OptionsKINSOL
+    PUBLIC
+    ${OPTIONS_LINKED_LIBS})
+
+target_link_libraries(OptionsKINSOL_static
+    PUBLIC
+    ${OPTIONS_LINKED_LIBS})
+
 # Solver libraries.
 set(SOLVER_SRC
     Instance.cpp

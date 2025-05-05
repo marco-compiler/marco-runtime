@@ -8,6 +8,17 @@ marco_add_runtime_shared_library(OptionsIDA
 marco_add_runtime_static_library(OptionsIDA_static
     ${OPTIONS_SRC})
 
+set(OPTIONS_LINKED_LIBS
+    SUNDIALS::ida)
+
+target_link_libraries(OptionsIDA
+    PUBLIC
+    ${OPTIONS_LINKED_LIBS})
+
+target_link_libraries(OptionsIDA_static
+    PUBLIC
+    ${OPTIONS_LINKED_LIBS})
+
 # Solver libraries.
 set(SOLVER_SRC
     Instance.cpp
