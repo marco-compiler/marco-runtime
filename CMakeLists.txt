@@ -1,11 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+set(CMAKE_CXX_STANDARD 17)
+
 #------------------------------------------------------------------------------
 # Project setup
 #------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.9)
-
 project(marco-runtime LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 17)
 
 # Set the default build type if none was specified
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
