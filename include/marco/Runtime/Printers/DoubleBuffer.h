@@ -2,6 +2,7 @@
 #define MARCO_RUNTIME_PRINTERS_DOUBLEBUFFER_H
 
 #include "marco/Runtime/Printers/Printer.h"
+#include <cstdint>
 #include <functional>
 
 namespace marco::runtime::printing {
