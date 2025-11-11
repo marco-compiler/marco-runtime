@@ -68,6 +68,23 @@ extern "C" {
 //===---------------------------------------------------------------------===//
 
 extern "C" {
+
+/// Returns true if the model beeing simulated has a specified default start
+/// time.
+bool hasExperimentStartTime();
+
+/// Returns true if the model beeing simulated has a specified default end time.
+bool hasExperimentEndTime();
+
+/// Gets the specified default start time of the simulation.
+/// `bool hasExperimentStartTime()` must be checked before calling this
+/// function.
+double getExperimentStartTime();
+
+/// Gets the specified default end time of the simulation.
+/// `bool hasExperimentEndTime()` must be checked before calling this function.
+double getExperimentEndTime();
+
 /// Get the current time of the simulation.
 double getTime();
 

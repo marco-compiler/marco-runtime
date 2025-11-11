@@ -267,6 +267,16 @@ void runtimeDeinit(Simulation &simulationInfo) {
 
   cli += printer->getCLIOptions();
 
+  // The default start and end time must be set before the CLI runs in order to
+  // get the correct defaults in the help text.
+  if (hasExperimentStartTime()) {
+    simulation::getOptions().startTime = getExperimentStartTime();
+  }
+
+  if (hasExperimentEndTime()) {
+    simulation::getOptions().endTime = getExperimentEndTime();
+  }
+
   argh::parser cmdl(argc, argv);
 
   if (cmdl["help"]) {
