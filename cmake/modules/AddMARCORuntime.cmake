@@ -7,6 +7,11 @@ macro(marco_add_runtime_library name)
 
     set_property(TARGET ${name} PROPERTY OUTPUT_NAME MARCORuntime${name})
 
+    # Enable MPI.
+    if (MPI_FOUND)
+        target_compile_definitions(${name} PRIVATE MPI_ENABLE)
+    endif()
+
     # Enable SUNDIALS
     if (MARCO_ENABLE_SUNDIALS)
         target_compile_definitions(${name} PRIVATE SUNDIALS_ENABLE)

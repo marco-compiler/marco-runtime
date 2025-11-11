@@ -80,6 +80,20 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 #------------------------------------------------------------------------------
+# MPI
+#------------------------------------------------------------------------------
+
+option(MARCO_MPI "Enable MPI" OFF)
+
+if (MARCO_MPI)
+    find_package(MPI)
+endif()
+
+if (MPI_FOUND)
+    message(STATUS "MPI found: ${MPI_CXX_LIBRARIES}")
+endif()
+
+#------------------------------------------------------------------------------
 # SUNDIALS libraries
 #------------------------------------------------------------------------------
 

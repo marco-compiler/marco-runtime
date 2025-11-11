@@ -10,6 +10,12 @@ set(SUNDIALS_LIB_PATH "dependencies/lib/sundials")
 list(APPEND EXTRA_LINK_ARGS
         ${CMAKE_THREAD_LIBS_INIT})
 
+if (MPI_FOUND)
+    set(MPI_ENABLE ON)
+else()
+    set(MPI_ENABLE OFF)
+endif()
+
 configure_package_config_file(
     MARCORuntimeConfig.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/MARCORuntimeConfig.cmake"
