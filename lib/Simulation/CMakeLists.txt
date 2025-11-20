@@ -40,6 +40,16 @@ target_link_libraries(Simulation_static
     PUBLIC
     ${SIMULATION_LINKED_LIBS})
 
+if (MPI_FOUND)
+    target_link_libraries(Simulation
+        PUBLIC
+        MPI::MPI_CXX)
+
+    target_link_libraries(Simulation_static
+        PUBLIC
+        MPI::MPI_CXX)
+endif()
+
 if (MARCO_PROFILING)
     target_link_libraries(Simulation
         PUBLIC

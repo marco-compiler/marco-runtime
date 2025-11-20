@@ -11,6 +11,10 @@
 #include <cassert>
 #include <iostream>
 
+#ifdef MPI_ENABLE
+#include <mpi.h>
+#endif // MPI_ENABLE
+
 using namespace ::marco::runtime;
 
 //===---------------------------------------------------------------------===//
@@ -221,6 +225,11 @@ void runtimeDeinit(Simulation &simulationInfo) {
 } // namespace
 
 [[maybe_unused]] int runSimulation(int argc, char *argv[]) {
+#ifdef MPI_ENABLE
+  // Initialize the MPI environment.
+  MPI_Init(&argc, &argv);
+#endif // MPI_ENABLE
+
   // Initialize the runtime library.
   Simulation simulation = runtimeInit();
 
@@ -293,6 +302,11 @@ void runtimeDeinit(Simulation &simulationInfo) {
 
   // De-initialize the runtime library.
   runtimeDeinit(simulation);
+
+#ifdef MPI_ENABLE
+  // Finalize the MPI environment.
+  MPI_Finalize();
+#endif // MPI_ENABLE
 
   return result;
 }
