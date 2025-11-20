@@ -45,6 +45,16 @@ static void printHelp() {
 //===---------------------------------------------------------------------===//
 
 namespace marco::runtime {
+Simulation::Simulation() {
+#ifdef MPI_ENABLE
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpiRank);
+#endif
+}
+
+int Simulation::getMPIRank() const { return mpiRank; }
+
+bool Simulation::isCoordinatorProcess() const { return getMPIRank() == 0; }
+
 int64_t Simulation::getNumOfPrintableScalarVariables() const {
   int64_t result = 0;
 

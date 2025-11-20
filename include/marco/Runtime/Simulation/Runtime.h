@@ -9,7 +9,18 @@
 
 namespace marco::runtime {
 class Simulation {
+  /// The identifier of the MPI process.
+  int mpiRank{0};
+
 public:
+  Simulation();
+
+  /// Get the identifier of the MPI process.
+  int getMPIRank() const;
+
+  /// Check if the current process is the coordinator.
+  bool isCoordinatorProcess() const;
+
   /// Get the overall number of printable scalar variables.
   int64_t getNumOfPrintableScalarVariables() const;
 
