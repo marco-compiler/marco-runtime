@@ -204,7 +204,6 @@ private:
   bool idaSetInitialStepSize();
   bool idaSetMinStepSize();
   bool idaSetMaxStepSize();
-  bool idaSetStopTime();
   bool idaSetMaxErrTestFails();
   bool idaSetSuppressAlg();
   bool idaSetId();
@@ -281,6 +280,7 @@ private:
   std::vector<uint64_t> equationOffsets;
 
   // Simulation times.
+  int64_t stepsNumber{0};
   realtype startTime;
   realtype endTime;
   realtype timeStep;

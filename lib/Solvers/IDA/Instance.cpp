@@ -648,7 +648,7 @@ bool IDAInstance::initialize() {
   }
 
   if (!idaSetUserData() || !idaSetMaxNumSteps() || !idaSetInitialStepSize() ||
-      !idaSetMinStepSize() || !idaSetMaxStepSize() || !idaSetStopTime() ||
+      !idaSetMinStepSize() || !idaSetMaxStepSize() ||
       !idaSetMaxErrTestFails() || !idaSetSuppressAlg() || !idaSetId() ||
       !idaSetJacobianFunction() || !idaSetMaxNonlinIters() ||
       !idaSetMaxConvFails() || !idaSetNonlinConvCoef() ||
@@ -787,12 +787,13 @@ bool IDAInstance::step() {
   IDA_PROFILER_STEPS_COUNTER_INCREMENT
   IDA_PROFILER_STEP_START
 
-  realtype tout =
-      getOptions().equidistantTimeGrid ? (currentTime + timeStep) : endTime;
+  ++stepsNumber;
 
-  auto solveRetVal = IDASolve(
-      idaMemory, tout, &currentTime, variablesVector, derivativesVector,
-      getOptions().equidistantTimeGrid ? IDA_NORMAL : IDA_ONE_STEP);
+  realtype tout =
+      getOptions().equidistantTimeGrid ? (stepsNumber * timeStep) : endTime;
+
+  auto solveRetVal = IDASolve(idaMemory, tout, &currentTime, variablesVector,
+                              derivativesVector, IDA_NORMAL);
 
   IDA_PROFILER_STEP_STOP
 
@@ -1683,24 +1684,6 @@ bool IDAInstance::idaSetMaxStepSize() {
   if (retVal == IDA_ILL_INPUT) {
     std::cerr << "IDASetMaxStep - Either hmax is not positive or it is smaller "
                  "than the minimum allowable step"
-              << std::endl;
-    return false;
-  }
-
-  return retVal == IDA_SUCCESS;
-}
-
-bool IDAInstance::idaSetStopTime() {
-  auto retVal = IDASetStopTime(idaMemory, endTime);
-
-  if (retVal == IDA_MEM_NULL) {
-    std::cerr << "IDASetMaxStep - The ida_mem pointer is NULL" << std::endl;
-    return false;
-  }
-
-  if (retVal == IDA_ILL_INPUT) {
-    std::cerr << "IDASetMaxStep - The value of tstop is not beyond the current "
-                 "t value"
               << std::endl;
     return false;
   }
