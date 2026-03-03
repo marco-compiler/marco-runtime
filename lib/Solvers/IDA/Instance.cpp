@@ -26,6 +26,14 @@ IDAInstance::IDAInstance()
     : startTime(simulation::getOptions().startTime),
       endTime(simulation::getOptions().endTime),
       timeStep(getOptions().timeStep) {
+#if SUNDIALS_VERSION_MAJOR >= 7
+#ifdef MPI_ENABLE
+  comm = MPI_COMM_WORLD;
+#else
+  comm = SUN_COMM_NULL;
+#endif
+#endif
+
   // Initially there is are no variables or equations in the instance.
   variableOffsets.push_back(0);
   equationOffsets.push_back(0);
@@ -384,8 +392,12 @@ bool IDAInstance::initialize() {
     return true;
   }
 
-#if SUNDIALS_VERSION_MAJOR >= 6
   // Create the SUNDIALS context.
+#if SUNDIALS_VERSION_MAJOR >= 7
+  if (SUNContext_Create(comm, &ctx) != 0) {
+    return false;
+  }
+#elif SUNDIALS_VERSION_MAJOR >= 6
   if (SUNContext_Create(nullptr, &ctx) != 0) {
     return false;
   }
@@ -636,7 +648,7 @@ bool IDAInstance::initialize() {
   }
 
   if (!idaSetUserData() || !idaSetMaxNumSteps() || !idaSetInitialStepSize() ||
-      !idaSetMinStepSize() || !idaSetMaxStepSize() || !idaSetStopTime() ||
+      !idaSetMinStepSize() || !idaSetMaxStepSize() ||
       !idaSetMaxErrTestFails() || !idaSetSuppressAlg() || !idaSetId() ||
       !idaSetJacobianFunction() || !idaSetMaxNonlinIters() ||
       !idaSetMaxConvFails() || !idaSetNonlinConvCoef() ||
@@ -775,12 +787,13 @@ bool IDAInstance::step() {
   IDA_PROFILER_STEPS_COUNTER_INCREMENT
   IDA_PROFILER_STEP_START
 
-  realtype tout =
-      getOptions().equidistantTimeGrid ? (currentTime + timeStep) : endTime;
+  ++stepsNumber;
 
-  auto solveRetVal = IDASolve(
-      idaMemory, tout, &currentTime, variablesVector, derivativesVector,
-      getOptions().equidistantTimeGrid ? IDA_NORMAL : IDA_ONE_STEP);
+  realtype tout =
+      getOptions().equidistantTimeGrid ? (stepsNumber * timeStep) : endTime;
+
+  auto solveRetVal = IDASolve(idaMemory, tout, &currentTime, variablesVector,
+                              derivativesVector, IDA_NORMAL);
 
   IDA_PROFILER_STEP_STOP
 
@@ -1671,24 +1684,6 @@ bool IDAInstance::idaSetMaxStepSize() {
   if (retVal == IDA_ILL_INPUT) {
     std::cerr << "IDASetMaxStep - Either hmax is not positive or it is smaller "
                  "than the minimum allowable step"
-              << std::endl;
-    return false;
-  }
-
-  return retVal == IDA_SUCCESS;
-}
-
-bool IDAInstance::idaSetStopTime() {
-  auto retVal = IDASetStopTime(idaMemory, endTime);
-
-  if (retVal == IDA_MEM_NULL) {
-    std::cerr << "IDASetMaxStep - The ida_mem pointer is NULL" << std::endl;
-    return false;
-  }
-
-  if (retVal == IDA_ILL_INPUT) {
-    std::cerr << "IDASetMaxStep - The value of tstop is not beyond the current "
-                 "t value"
               << std::endl;
     return false;
   }

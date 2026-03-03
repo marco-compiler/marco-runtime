@@ -204,7 +204,6 @@ private:
   bool idaSetInitialStepSize();
   bool idaSetMinStepSize();
   bool idaSetMaxStepSize();
-  bool idaSetStopTime();
   bool idaSetMaxErrTestFails();
   bool idaSetSuppressAlg();
   bool idaSetId();
@@ -232,6 +231,10 @@ private:
   /// }
 
 private:
+#if SUNDIALS_VERSION_MAJOR >= 7
+  SUNComm comm{0};
+#endif
+
 #if SUNDIALS_VERSION_MAJOR >= 6
   // SUNDIALS context.
   SUNContext ctx{nullptr};
@@ -277,6 +280,7 @@ private:
   std::vector<uint64_t> equationOffsets;
 
   // Simulation times.
+  int64_t stepsNumber{0};
   realtype startTime;
   realtype endTime;
   realtype timeStep;
