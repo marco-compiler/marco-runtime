@@ -26,6 +26,14 @@ IDAInstance::IDAInstance()
     : startTime(simulation::getOptions().startTime),
       endTime(simulation::getOptions().endTime),
       timeStep(getOptions().timeStep) {
+#if SUNDIALS_VERSION_MAJOR >= 7
+#ifdef MPI_ENABLE
+  comm = MPI_COMM_WORLD;
+#else
+  comm = SUN_COMM_NULL;
+#endif
+#endif
+
   // Initially there is are no variables or equations in the instance.
   variableOffsets.push_back(0);
   equationOffsets.push_back(0);
@@ -384,8 +392,12 @@ bool IDAInstance::initialize() {
     return true;
   }
 
-#if SUNDIALS_VERSION_MAJOR >= 6
   // Create the SUNDIALS context.
+#if SUNDIALS_VERSION_MAJOR >= 7
+  if (SUNContext_Create(comm, &ctx) != 0) {
+    return false;
+  }
+#elif SUNDIALS_VERSION_MAJOR >= 6
   if (SUNContext_Create(nullptr, &ctx) != 0) {
     return false;
   }

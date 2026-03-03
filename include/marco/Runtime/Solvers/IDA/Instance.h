@@ -232,6 +232,10 @@ private:
   /// }
 
 private:
+#if SUNDIALS_VERSION_MAJOR >= 7
+  SUNComm comm{0};
+#endif
+
 #if SUNDIALS_VERSION_MAJOR >= 6
   // SUNDIALS context.
   SUNContext ctx{nullptr};

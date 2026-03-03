@@ -35,18 +35,17 @@ cd "$TEMP_DIR" || fail "Error creating the temporary directory"
 
 BUILD_TYPE=Release
 
-OPENBLAS=OpenBLAS-0.3.23
-SUITESPARSE=SuiteSparse-7.1.0
-SUNDIALS=sundials-6.6.0
+OPENBLAS=OpenBLAS-0.3.31
+SUITESPARSE=SuiteSparse-7.12.2
+SUNDIALS=sundials-7.6.0
 
-OPENBLAS_URL=https://github.com/xianyi/OpenBLAS/releases/download/v0.3.23/OpenBLAS-0.3.23.tar.gz
-SUITESPARSE_URL=https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/v7.1.0.tar.gz
-SUNDIALS_URL=https://github.com/LLNL/sundials/releases/download/v6.6.0/sundials-6.6.0.tar.gz
+OPENBLAS_URL=https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.31/OpenBLAS-0.3.31.tar.gz
+SUITESPARSE_URL=https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v7.12.2.tar.gz
+SUNDIALS_URL=https://github.com/llnl/sundials/archive/refs/tags/v7.6.0.tar.gz
 
-[ -f $OPENBLAS.tar.gz ]    || wget $OPENBLAS_URL    || fail "Error downloading $OPENBLAS.tar.gz"
-[ -f $SUITESPARSE.tar.gz ] || wget $SUITESPARSE_URL || fail "Error downloading $SUITESPARSE.tar.gz"
-[ -f $SUITESPARSE.tar.gz ] || mv v7.1.0.tar.gz $SUITESPARSE.tar.gz # HACK to fix file name
-[ -f $SUNDIALS.tar.gz ]    || wget $SUNDIALS_URL    || fail "Error downloading $SUNDIALS.tar.gz"
+[ -f $OPENBLAS.tar.gz ]    || wget $OPENBLAS_URL -O $OPENBLAS.tar.gz        || fail "Error downloading $OPENBLAS.tar.gz"
+[ -f $SUITESPARSE.tar.gz ] || wget $SUITESPARSE_URL -O $SUITESPARSE.tar.gz  || fail "Error downloading $SUITESPARSE.tar.gz"
+[ -f $SUNDIALS.tar.gz ]    || wget $SUNDIALS_URL -O $SUNDIALS.tar.gz        || fail "Error downloading $SUNDIALS.tar.gz"
 
 tar xzvf $OPENBLAS.tar.gz    || fail "Error extracting $OPENBLAS.tar.gz"
 tar xzvf $SUITESPARSE.tar.gz || fail "Error extracting $SUITESPARSE.tar.gz"
@@ -117,7 +116,7 @@ cd $SUNDIALS|| fail "Error extracting $SUNDIALS.tar.gz"
 # ENABLE_XBRAID                    OFF
 mkdir build
 cd build || fail "Error creating the build folder for Sundials"
-cmake .. -DENABLE_KLU=ON -DKLU_INCLUDE_DIR="$INSTDIR/include" -DKLU_LIBRARY_DIR="$INSTDIR/lib" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_INSTALL_PREFIX="$INSTDIR" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON
+cmake .. -DENABLE_KLU=ON -DKLU_INCLUDE_DIR="$INSTDIR/include/suitesparse" -DKLU_LIBRARY_DIR="$INSTDIR/lib" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_INSTALL_PREFIX="$INSTDIR" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON
 make -j `nproc` || fail "Sundials build failed"
 make install || fail "Sundials install failed"
 
