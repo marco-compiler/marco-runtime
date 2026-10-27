@@ -51,18 +51,19 @@ set(SOLVER_LINKED_LIBS
     OptionsIDA
     SolverSUNDIALS
     Modeling
-    Multithreading
-    Support)
+    Multithreading)
 
 target_link_libraries(SolverIDA
     PUBLIC
     ${SOLVER_LINKED_LIBS}
-    OptionsSimulation)
+    OptionsSimulation
+    Support)
 
 target_link_libraries(SolverIDA_static
     PUBLIC
     ${SOLVER_LINKED_LIBS}
-    OptionsSimulation_static)
+    OptionsSimulation_static
+    Support_static)
 
 if (MARCO_PROFILING)
     target_link_libraries(SolverIDA
